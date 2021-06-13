@@ -1,23 +1,11 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from numpy.random import default_rng
+import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import seaborn as sns
 from sklearn.model_selection import KFold
 
-# (x, y, T) file
-u_array = np.load("u_array.npy")
-v_array = np.load("v_array.npy")
-rng = default_rng(12345)
-
-x_start = 50
-y_start = 300
-u = u_array[x_start, y_start, :]  # 100 x 1 array. Need covariance of each point --> 100 x 100 array
-v = v_array[x_start, y_start, :]
-l2 = 10
-sig2 = .001
-tau = .0001
 
 
 
@@ -273,7 +261,7 @@ def animate(n):
     ani.save("ToySearchDaysMany2.gif", writer=animation.PillowWriter(fps=20))
     plt.show()
 
-animate(n=300)
+#animate(n=300)
 
 def compute_correlations(ar1, ar2):
     # ar is a 1D array (1x100) for point x,y for times T = 1 - 100
@@ -348,17 +336,44 @@ def calc_velocity():
 
 ### LOAD DATA ###
 def load_save_data():
+    # Creates a 3d array (x, y, t) for both u and v directions and saves file
+    # Creates a mask numpy array (x, y) that indicates land vs ocean and saves file
     time = range(2, 101)
-    u_array = np.transpose(np.loadtxt("OceanFlow/1u.csv", delimiter=','))
-    v_array = np.transpose(np.loadtxt("OceanFlow/1v.csv", delimiter=','))
+    u_3d = np.transpose(np.loadtxt("OceanFlowData/1u.csv", delimiter=','))
+    v_3d = np.transpose(np.loadtxt("OceanFlowData/1v.csv", delimiter=','))
+    mask = np.transpose(np.loadtxt("OceanFlowData/mask.csv", delimiter=','))
 
     for i in time:
-        u_array_open = np.transpose(np.loadtxt("OceanFlow/" + str(i) + "u.csv", delimiter=','))
-        u_array = np.dstack((u_array, u_array_open))
-        v_array_open = np.transpose(np.loadtxt("OceanFlow/" + str(i) + "v.csv", delimiter=','))
-        v_array = np.dstack((v_array, v_array_open))
+        u_3d_open = np.transpose(np.loadtxt("OceanFlowData/" + str(i) + "u.csv", delimiter=','))
+        u_3d = np.dstack((u_3d, u_3d_open))
+        v_3d_open = np.transpose(np.loadtxt("OceanFlowData/" + str(i) + "v.csv", delimiter=','))
+        v_3d = np.dstack((v_3d, v_3d_open))
 
-    np.save("u_array", u_array, allow_pickle=True)
-    np.save("v_array", v_array, allow_pickle=True)
+    np.save("u_3d", u_3d, allow_pickle=True)
+    np.save("v_3d", v_3d, allow_pickle=True)
+    np.save("mask", mask, allow_pickle=True)
 
 
+def main():
+    # (x, y, T) file
+    try:
+        u_3d = np.load("u_3d.npy")
+        v_3d = np.load("v_3d.npy")
+    except FileNotFoundError:
+        load_save_data()
+        u_3d = np.load("u_3d.npy")
+        v_3d = np.load("v_3d.npy")
+
+    # rng = default_rng(12345)
+    #
+    # x_start = 50
+    # y_start = 300
+    # u = u_array[x_start, y_start, :]  # 100 x 1 array. Need covariance of each point --> 100 x 100 array
+    # v = v_array[x_start, y_start, :]
+    # l2 = 10
+    # sig2 = .001
+    # tau = .0001
+
+
+if __name__ == "__main__":
+    main()
