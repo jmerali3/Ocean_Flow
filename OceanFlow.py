@@ -5,11 +5,11 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import seaborn as sns
 from sklearn.model_selection import KFold
+from PIL import Image
+import OceanFlow_utils
 
 
-
-
-def compute_kernel(arr, l_sq, sig_sq, arr2 = None):
+def compute_kernel(arr, l_sq, sig_sq, arr2=None):
     # This computes the kernel between the INDICES of train and test, not the labels.
     # The idea is that closer indices (x-axis) leads to higher covariance
     if arr2 is not None:
@@ -31,34 +31,36 @@ def interpolate(arr, n, l2, sig2, tau, plot=False):
     train = np.linspace(0, 100, len(arr))
 
     K_ss = compute_kernel(test, l2, sig2)
-    L = np.linalg.cholesky(K_ss + tau*np.eye(n))
+    L = np.linalg.cholesky(K_ss + tau * np.eye(n))
     f_prior = np.dot(L, np.random.normal(size=(n, 3)))
 
     K = compute_kernel(train, l2, sig2)
-    L = np.linalg.cholesky(K + tau*np.eye(len(train)))
+    L = np.linalg.cholesky(K + tau * np.eye(len(train)))
 
     K_s = compute_kernel(train, l2, sig2, test)
     Lk = np.linalg.solve(L, K_s)
-    mu = np.dot(Lk.T, np.linalg.solve(L, arr)).reshape((n,)) # This is where labels come in (arr)
+    mu = np.dot(Lk.T, np.linalg.solve(L, arr)).reshape((n,))  # This is where labels come in (arr)
 
-    s2 = np.diag(K_ss) - np.sum(Lk**2, axis=0)
+    s2 = np.diag(K_ss) - np.sum(Lk ** 2, axis=0)
     stdv = np.sqrt(s2)
 
-    L_final = np.linalg.cholesky(K_ss + tau*np.eye(n) - np.dot(Lk.T, Lk))
-    f_post = mu.reshape(-1,1) + np.dot(L_final, np.random.normal(size = (n,1))) # mu + beta*N(0,I), draws random samples
+    L_final = np.linalg.cholesky(K_ss + tau * np.eye(n) - np.dot(Lk.T, Lk))
+    f_post = mu.reshape(-1, 1) + np.dot(L_final,
+                                        np.random.normal(size=(n, 1)))  # mu + beta*N(0,I), draws random samples
     if plot:
         plt.plot(train, arr, c='crimson', lw=3, label="Ground Truth")
         plt.plot(test, f_post, c='darkgreen', label="Predicted F_Posterior")
-        plt.gca().fill_between(test.flat, mu-3*stdv, mu+3*stdv, color="#dddddd")
+        plt.gca().fill_between(test.flat, mu - 3 * stdv, mu + 3 * stdv, color="#dddddd")
         plt.plot(test, mu, 'r--', lw=3, label="Mu - Average", c="darkblue")
         title = "U Direction" if arr is u else "V Direction Interpolation"
-        plt.title(title +f" tau = {tau}, l^2 = {l2}, sig^2 = {sig2}")
+        plt.title(title + f" tau = {tau}, l^2 = {l2}, sig^2 = {sig2}")
         plt.legend()
         plt.show()
 
     return f_post, mu, stdv
 
-#f_post, mu, stdv = interpolate(u, 300, l2, sig2, tau)
+
+# f_post, mu, stdv = interpolate(u, 300, l2, sig2, tau)
 
 
 def compute_movement_extended(x_current, y_current, n):
@@ -73,10 +75,10 @@ def compute_movement_extended(x_current, y_current, n):
         f_post_v, mu_v, stdv_v = interpolate(v_array[int_x, int_y, :], n, l2, sig2, tau)
         u[i] = f_post_u[i]
         v[i] = f_post_v[i]
-        x_current = x_current + u[i]*24   # km = km + km/hr * 24 hr/day. Each time step is 1 day in f_post
-        y_current = y_current + v[i]*24
+        x_current = x_current + u[i] * 24  # km = km + km/hr * 24 hr/day. Each time step is 1 day in f_post
+        y_current = y_current + v[i] * 24
 
-    #movement_summary = pd.DataFrame({'x': x, 'y': y, 'u': u, 'v': v}) # row is timestep, columns are x coord, y coord, x magnitude, y magnitude
+    # movement_summary = pd.DataFrame({'x': x, 'y': y, 'u': u, 'v': v}) # row is timestep, columns are x coord, y coord, x magnitude, y magnitude
     movement_summary = np.stack((x, y, u, v), axis=1)
     return movement_summary
 
@@ -95,13 +97,14 @@ def Kfold_function(data, l_sq, sig_sq, tau, plot=False):
         K_train = compute_kernel(train, l_sq, sig_sq)
         K_test = compute_kernel(test, l_sq, sig_sq)
         K_cross = compute_kernel(train, l_sq, sig_sq, arr2=test)
-        L = np.linalg.cholesky(K_train + tau*np.eye(len(train)))
+        L = np.linalg.cholesky(K_train + tau * np.eye(len(train)))
         Lk = np.linalg.solve(L, K_cross)
         mu = np.dot(Lk.T, np.linalg.solve(L, train_labels))
-        stdv = np.sqrt(np.diag(K_test) - np.sum(Lk**2, axis=0))
-        L_final = np.linalg.cholesky(K_test + tau*np.eye(n) - np.dot(Lk.T, Lk))
-        f_post = mu.reshape(-1,1) + L_final @ np.random.normal(size=(n,1))
-        log_lik = -.5*f_post.T @ np.linalg.solve(K_test, f_post) - .5 * np.log(np.linalg.det(K_test)) - 10/2 * np.log(2*np.pi)
+        stdv = np.sqrt(np.diag(K_test) - np.sum(Lk ** 2, axis=0))
+        L_final = np.linalg.cholesky(K_test + tau * np.eye(n) - np.dot(Lk.T, Lk))
+        f_post = mu.reshape(-1, 1) + L_final @ np.random.normal(size=(n, 1))
+        log_lik = -.5 * f_post.T @ np.linalg.solve(K_test, f_post) - .5 * np.log(
+            np.linalg.det(K_test)) - 10 / 2 * np.log(2 * np.pi)
         loss.append(log_lik)
         # fpost_list.append(f_post)
         # stdv_list.append(stdv)
@@ -114,7 +117,8 @@ def Kfold_function(data, l_sq, sig_sq, tau, plot=False):
             plt.plot(test, mu, 'r--', lw=2)
             plt.show()
 
-    return loss, round(np.array(loss).mean(),2) #, fpost_list, stdv_list, mu_list, test_list
+    return loss, round(np.array(loss).mean(), 2)  # , fpost_list, stdv_list, mu_list, test_list
+
 
 # sig_sq = .001
 # l_sq = 15
@@ -170,7 +174,6 @@ def parameter_optimization(direction):
     plt.show()
 
 
-
 def heatmap(K):
     mask = np.zeros_like(K)
     mask[np.triu_indices_from(mask)] = True
@@ -178,31 +181,6 @@ def heatmap(K):
         f, ax = plt.subplots()
         ax = sns.heatmap(K, mask=mask, square=True, cmap="YlGnBu")
         plt.show()
-
-
-def streamplots():
-    x = np.arange(504)
-    y = np.arange(555)
-    fig, ax = plt.subplots()
-    strm = ax.streamplot(x, y, u_array[:,:,0], v_array[:,:,0], linewidth=2, cmap=plt.cm.autumn)
-    fig.colorbar(strm.lines)
-    plt.show()
-
-
-def compute_movement(x_current, y_current):
-    # computes new movements and locations for each time step, given x and y initial coordinates
-    x, y, u, v = [np.zeros(100) for _ in range(4)]
-    for i in range(100):
-        x[i] = x_current
-        y[i] = y_current
-        u[i] = u_array[int(round(x_current, 0)), int(round(y_current, 0)), i]
-        v[i] = v_array[int(round(x_current, 0)), int(round(y_current, 0)), i]
-        x_current = x_current + u[i]   # Time step is 3 hours and each grid space is 3 hours = 1 grid space per time unit
-        y_current = y_current + v[i]
-
-    #movement_summary = pd.DataFrame({'x': x, 'y': y, 'u': u, 'v': v}) # row is timestep, columns are x coord, y coord, x magnitude, y magnitude
-    movement_summary = np.stack((x, y, u, v), axis=1)
-    return movement_summary
 
 
 def get_coordinates(length):
@@ -216,9 +194,9 @@ def get_coordinates(length):
 
 
 def get_coordinates_toy(length, mu_x, mu_y, var_x, var_y):
-    x = rng.normal(mu_x, var_x, length-1)
+    x = rng.normal(mu_x, var_x, length - 1)
     x = np.append(x, mu_x)
-    y = rng.normal(mu_y, var_y, length-1)
+    y = rng.normal(mu_y, var_y, length - 1)
     y = np.append(y, mu_y)
     coordinates = list(zip(x, y))
     return coordinates
@@ -228,12 +206,12 @@ def animate(n):
     def get_colors(length):
         rbg = []
         for i in range(length):
-            rbg.append(tuple(rng.random(3,)))
+            rbg.append(tuple(rng.random(3, )))
         return rbg
 
     sig_x = 30
     sig_y = 30
-    #coordinates = get_coordinates_toy(10, 100, 350, sig_x, sig_y) # 10 is the number of samples
+    # coordinates = get_coordinates_toy(10, 100, 350, sig_x, sig_y) # 10 is the number of samples
     # Can use either get_coordinates or get_coordinates_toy depending on what you want
     coordinates = get_coordinates(50)
     colors = get_colors(len(coordinates))
@@ -241,7 +219,7 @@ def animate(n):
     tx, ty = [np.zeros([n, len(coordinates)]) for _ in range(2)]
 
     for i, (x, y) in enumerate(coordinates):
-        movement = compute_movement_extended(x, y, n) # n is number of days
+        movement = compute_movement_extended(x, y, n)  # n is number of days
         tx[:, i] = movement[:, 0]
         ty[:, i] = movement[:, 1]
 
@@ -250,10 +228,10 @@ def animate(n):
     # ax.set_ylim([0, 503])
     ax.set_xlim([0, 250])
     ax.set_ylim([250, 503])
-    ax.scatter([],[])
+    ax.scatter([], [])
 
     def animate2(i):
-        ax.set_title(f"T = {i+1}, var_x = {sig_x}, var_y = {sig_y}")
+        ax.set_title(f"T = {i + 1}, var_x = {sig_x}, var_y = {sig_y}")
         ax.scatter(tx[i, :], ty[i, :], c=colors, s=2)
         return ax
 
@@ -261,18 +239,37 @@ def animate(n):
     ani.save("ToySearchDaysMany2.gif", writer=animation.PillowWriter(fps=20))
     plt.show()
 
-#animate(n=300)
 
-def compute_correlations(ar1, ar2):
-    # ar is a 1D array (1x100) for point x,y for times T = 1 - 100
-    if np.array_equal(ar1, ar2):
-        return 0
-    else:
-        return (np.corrcoef(ar1, ar2)[0, 1]).round(2)
+# animate(n=300)
 
 
 def get_corr_dict(arr1, arr2):
+    """Returns a dictionary of points (keys) and coefficients (values) that are highly correlated or anti-correlated
+
+    Runs the following algorithm 100,000 times
+    1. Create 4 random integers within the bounds of the grid
+        a. (x1, y1; x2, y2), which correspond to two pairs of points on the ‘u’ grid
+    2. Find the arrays corresponding to the velocity at those points for t = {1,…,100}
+        a. Yields two 1x100 arrays
+        b. if either are zero vectors, end this iteration
+    3. Compute the correlation for these ‘u’ grid vectors
+    4. Cutoff criteria
+        i. If the absolute value of the correlation coefficient is > .9
+        ii. x distances are greater than 5 grid units
+        iii. y distances are greater than 5 grid units
+    5. If those are met, compute the correlation coefficient at the same spot for the ‘v’ vector
+        i. If the absolute value of the correlation coefficient is > .9, then add to dictionary
+    6. Key = (x1, y1, x2, y2), value = (u_corr_coeff, v_corr_coeff)
+    """
+
+    def compute_correlations(point_vec_1, point_vec_2):
+        """arr is a 1D array (1x100) for point x,y for times T = 1 - 100"""
+        if np.array_equal(point_vec_1, point_vec_2):
+            return 0
+        return (np.corrcoef(point_vec_1, point_vec_2)[0, 1]).round(2)
+
     samples = range(100000)
+    rng = default_rng(12345)
     correlations_dict = {}
     for _ in samples:
         x_rand1 = rng.integers(low=0, high=554, endpoint=True)
@@ -287,7 +284,11 @@ def get_corr_dict(arr1, arr2):
 
         corr1 = compute_correlations(point_vec_A, point_vec_B)
 
-        if abs(corr1) > .9 and (x_rand1-x_rand2) > 5 and (y_rand1-y_rand2) > 5:
+        cutoff = [abs(corr1) > .9,
+                  (x_rand1 - x_rand2) > 5,
+                  (y_rand1 - y_rand2) > 5]
+
+        if np.all(cutoff):
             point_vec_C = arr2[x_rand1, y_rand1, :]
             point_vec_D = arr2[x_rand2, y_rand2, :]
             corr2 = compute_correlations(point_vec_C, point_vec_D)
@@ -297,13 +298,13 @@ def get_corr_dict(arr1, arr2):
                 correlations_dict[key] = (corr1, corr2)
     return correlations_dict
 
-#correlations = get_corr_dict(u_array, v_array)
+
+# correlations = get_corr_dict(u_array, v_array)
 
 # for key, value in correlations.items():
 #     x1, y1, x2, y2 = key
 #     corr1, corr2 = value
 #     print(f"Point 1: ({x1},{y1}); Point 2: ({x2},{y2}); u-corr: {corr1}; v-corr: {corr2}")
-
 
 
 # print(u_array[358, 87, :])
@@ -312,60 +313,52 @@ def get_corr_dict(arr1, arr2):
 # print(v_array[98, 6, :])
 
 
-def other_calcs():
-    velocity = np.load("velocity.npy")
-    velocity[velocity == 0] = np.nan
-    var_velocity = np.nanvar(velocity, axis=2)
-    var_velocity[var_velocity == 0] = np.nan
-    min_var =np.nanmin(var_velocity)
-    min_var_loc = np.where(var_velocity == min_var)
-    max_x = np.max(u_array)
-    max_x_loc = np.where(u_array == max_x)
-    x_avg = np.mean(u_array.flatten())
-    y_avg = np.mean(v_array.flatten())
-    print(velocity[358, 87, :].mean())
-    print(velocity[98, 6, :].mean())
+def ocean_streamplots(u, v, mask):
+    """Plots & animates the velocity-weighted  flow using Matplotlib Streamplots with a mask background"""
+    rows, columns, time = np.shape(u)
+    x = np.arange(columns)
+    y = np.arange(rows)
 
+    fig, ax = plt.subplots()
+    plt.tight_layout()
 
-### CALC VELOCITY ###
-def calc_velocity():
-    velocity = np.sqrt(np.square(u_array) + np.square(v_array))
-    print(velocity.shape)
-    np.save("velocity", velocity, allow_pickle=True)
+    def stream_animate(t):
+        """Returns streamplot at time = t to be used by FuncAnimation"""
+        plt.cla()
+        ax.imshow(mask, alpha=0.5, cmap='ocean', aspect='auto')
+        ax.set_aspect('equal')
+        u_m = np.ma.array(u[:, :, t], mask=~mask)
+        v_m = np.ma.array(v[:, :, t], mask=~mask)
+        velocity = OceanFlow_utils.calc_velocity(u_m, v_m)
+        ax.set_title(f"Streamplots at t={t}")
+        lw = 4 * velocity / velocity.max()
+        ax.streamplot(x, y, u_m, v_m, density=.75, linewidth=lw)
+        return ax
 
-
-### LOAD DATA ###
-def load_save_data():
-    # Creates a 3d array (x, y, t) for both u and v directions and saves file
-    # Creates a mask numpy array (x, y) that indicates land vs ocean and saves file
-    time = range(2, 101)
-    u_3d = np.transpose(np.loadtxt("OceanFlowData/1u.csv", delimiter=','))
-    v_3d = np.transpose(np.loadtxt("OceanFlowData/1v.csv", delimiter=','))
-    mask = np.transpose(np.loadtxt("OceanFlowData/mask.csv", delimiter=','))
-
-    for i in time:
-        u_3d_open = np.transpose(np.loadtxt("OceanFlowData/" + str(i) + "u.csv", delimiter=','))
-        u_3d = np.dstack((u_3d, u_3d_open))
-        v_3d_open = np.transpose(np.loadtxt("OceanFlowData/" + str(i) + "v.csv", delimiter=','))
-        v_3d = np.dstack((v_3d, v_3d_open))
-
-    np.save("u_3d", u_3d, allow_pickle=True)
-    np.save("v_3d", v_3d, allow_pickle=True)
-    np.save("mask", mask, allow_pickle=True)
+    ani = animation.FuncAnimation(fig, stream_animate, frames=time, interval=200, repeat=False)
+    ani.save("Streamplots.gif", writer=animation.PillowWriter(fps=4))
+    plt.show()
 
 
 def main():
-    # (x, y, T) file
     try:
-        u_3d = np.load("u_3d.npy")
-        v_3d = np.load("v_3d.npy")
+        u_3d, v_3d, mask = np.load("u_3d.npy"), np.load("v_3d.npy"), np.load("mask.npy").astype('bool')
     except FileNotFoundError:
-        load_save_data()
-        u_3d = np.load("u_3d.npy")
-        v_3d = np.load("v_3d.npy")
+        OceanFlow_utils.load_save_data()
+        u_3d, v_3d, mask = np.load("u_3d.npy"), np.load("v_3d.npy"), np.load("mask.npy").astype('bool')
 
-    # rng = default_rng(12345)
-    #
+    filename = "mask.png"
+    try:
+        mask_image = Image.open(filename)
+    except FileNotFoundError:
+        OceanFlow_utils.create_mask_image(mask, filename)
+        mask_image = Image.open(filename)
+
+    ### Commenting this out because it takes a long time to run. Uncomment for final version
+    # ocean_streamplots(u_3d, v_3d, mask)
+    ###
+
+
     # x_start = 50
     # y_start = 300
     # u = u_array[x_start, y_start, :]  # 100 x 1 array. Need covariance of each point --> 100 x 100 array
