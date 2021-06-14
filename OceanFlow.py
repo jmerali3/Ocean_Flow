@@ -314,25 +314,27 @@ def get_corr_dict(arr1, arr2):
 
 
 def ocean_streamplots(u, v, mask):
-    """Plots & animates the velocity-weighted  flow using Matplotlib Streamplots with a mask background"""
+    """Plots & animates the velocity-weighted  flow using Matplotlib Streamplots with a mask background
+    There is still a bug in the code that makes the gif resize at certain time points, but it's time to move on for now
+    """
     rows, columns, time = np.shape(u)
     x = np.arange(columns)
     y = np.arange(rows)
-
     fig, ax = plt.subplots()
 
     def stream_animate(t):
         """Returns streamplot at time = t to be used by FuncAnimation"""
         plt.cla()
-        ax.imshow(mask, alpha=0.5, cmap='ocean', aspect='auto')
+        plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
+        ax.imshow(mask, alpha=0.5, cmap='ocean', aspect=columns/rows)
         ax.set_aspect('equal')
         u_m = np.ma.array(u[:, :, t], mask=~mask)
         v_m = np.ma.array(v[:, :, t], mask=~mask)
         velocity = OceanFlow_utils.calc_velocity(u_m, v_m)
         ax.set_title(f"Streamplots at t={t}")
         lw = 4 * velocity / velocity.max()
-        ax.streamplot(x, y, u_m, v_m, density=.75, linewidth=lw)
-        plt.tight_layout()
+        ax.streamplot(x, y, u_m, v_m, density=2, linewidth=lw)
+        fig.tight_layout()
         return ax
 
     ani = animation.FuncAnimation(fig, stream_animate, frames=time, interval=200, repeat=False)
