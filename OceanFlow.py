@@ -320,7 +320,6 @@ def ocean_streamplots(u, v, mask):
     y = np.arange(rows)
 
     fig, ax = plt.subplots()
-    plt.tight_layout()
 
     def stream_animate(t):
         """Returns streamplot at time = t to be used by FuncAnimation"""
@@ -333,6 +332,7 @@ def ocean_streamplots(u, v, mask):
         ax.set_title(f"Streamplots at t={t}")
         lw = 4 * velocity / velocity.max()
         ax.streamplot(x, y, u_m, v_m, density=.75, linewidth=lw)
+        plt.tight_layout()
         return ax
 
     ani = animation.FuncAnimation(fig, stream_animate, frames=time, interval=200, repeat=False)
@@ -355,7 +355,7 @@ def main():
         mask_image = Image.open(filename)
 
     ### Commenting this out because it takes a long time to run. Uncomment for final version
-    # ocean_streamplots(u_3d, v_3d, mask)
+    ocean_streamplots(u_3d, v_3d, mask)
     ###
 
     # x_start = 50
