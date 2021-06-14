@@ -9,6 +9,7 @@ def load_save_data():
     """ Creates a 3d array (x, y, t):(504, 555, 100) for both u and v directions; saves files as u_3d.npy and v_3d.npy
     Creates a 2D mask numpy array or grid (x, y):(504, 555) that indicates land vs ocean; saves file as mask.npy
     Each grid unit is equivalent to 3 kms
+    Note - the OceanFlowData/*.csv files and *.npy files are in .gitignore to save space and improve performance
     """
     time = range(2, 101)
     u_3d = np.loadtxt("OceanFlowData/1u.csv", delimiter=',')
@@ -30,16 +31,13 @@ def create_mask_image(mask, filename):
     """Creates a seaborn heatmap and saves it. This is intended to be an 'implot' background for other plots
         Filename must be in png format
     """
-    sns.heatmap(mask, cbar=False, cmap='Blues')
-    #ocean cmap
+    filename = filename if filename[-4:] == ".png" else filename + ".png"
+    sns.heatmap(~mask, cbar=False, cmap='Greens')
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     plt.axis('tight')
     plt.axis('off')
+    plt.savefig(filename, format='png', transparent=True)
     plt.show()
-    try:
-        plt.savefig(filename, format='png', transparent=True)
-    except:
-        print("Please enter filename in .png format")
 
 
 def calc_velocity(u, v):

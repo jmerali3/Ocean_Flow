@@ -358,7 +358,6 @@ def main():
     # ocean_streamplots(u_3d, v_3d, mask)
     ###
 
-
     # x_start = 50
     # y_start = 300
     # u = u_array[x_start, y_start, :]  # 100 x 1 array. Need covariance of each point --> 100 x 100 array
