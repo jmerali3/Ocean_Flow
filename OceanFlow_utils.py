@@ -2,9 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import seaborn as sns
-
+from numpy.random import default_rng
 
 # Utility functions for loading, saving, and analyzing Ocean Flow data
+
+rng = default_rng(12345)
 
 def load_save_data():
     """ Creates a 3d array (x, y, t):(504, 555, 100) for both u and v directions; saves files as u_3d.npy and v_3d.npy
@@ -53,16 +55,42 @@ def get_3d_size_extent(array):
     return {"rows": rows, "columns": columns, "time": time, "extent": extent}
 
 
-def compute_movement(x_current, y_current):
+def compute_movement(x_current, y_current, u_3d, v_3d, time):
     """Computes new movements and locations for each time step, given x and y initial coordinates"""
-    x, y, u, v = [np.zeros(100) for _ in range(4)]
-    for i in range(100):
+    x, y, u, v = [np.zeros(time) for _ in range(4)]
+    for i in range(time):
         x[i] = x_current
         y[i] = y_current
-        u[i] = u_array[int(round(x_current, 0)), int(round(y_current, 0)), i]
-        v[i] = v_array[int(round(x_current, 0)), int(round(y_current, 0)), i]
+        u[i] = u_3d[int(round(x_current, 0)), int(round(y_current, 0)), i]
+        v[i] = v_3d[int(round(x_current, 0)), int(round(y_current, 0)), i]
         x_current = x_current + u[i]  # Time step is 3 hours and each grid space is 3 hours = 1 grid space per time unit
         y_current = y_current + v[i]
 
     movement_summary = np.stack((x, y, u, v), axis=1)
     return movement_summary
+
+
+# def get_coordinates(length):
+#     coordinates = []
+#     for i in range(length):
+#         x = rng.integers(low=0, high=554, endpoint=True)
+#         y = rng.integers(low=0, high=503, endpoint=True)
+#         if u_array[x, y, 0] != 0 and v_array[x, y, 0] != 0:
+#             coordinates.append((x, y))
+#     return coordinates
+
+
+def get_coordinates_toy(length, mu_x, mu_y, var_xy):
+    x = rng.normal(mu_x, var_xy, length - 1)
+    x = np.append(x, mu_x)
+    y = rng.normal(mu_y, var_xy, length - 1)
+    y = np.append(y, mu_y)
+    coordinates = list(zip(x, y))
+    return coordinates
+
+
+def get_colors(length):
+    rbg = []
+    for i in range(length):
+        rbg.append(tuple(rng.random(3, )))
+    return rbg

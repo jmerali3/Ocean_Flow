@@ -8,6 +8,7 @@ from sklearn.model_selection import KFold
 from PIL import Image
 import OceanFlow_utils
 
+rng = default_rng(12345)
 
 def compute_kernel(arr, l_sq, sig_sq, arr2=None):
     # This computes the kernel between the INDICES of train and test, not the labels.
@@ -183,32 +184,7 @@ def heatmap(K):
         plt.show()
 
 
-def get_coordinates(length):
-    coordinates = []
-    for i in range(length):
-        x = rng.integers(low=0, high=554, endpoint=True)
-        y = rng.integers(low=0, high=503, endpoint=True)
-        if u_array[x, y, 0] != 0 and v_array[x, y, 0] != 0:
-            coordinates.append((x, y))
-    return coordinates
-
-
-def get_coordinates_toy(length, mu_x, mu_y, var_x, var_y):
-    x = rng.normal(mu_x, var_x, length - 1)
-    x = np.append(x, mu_x)
-    y = rng.normal(mu_y, var_y, length - 1)
-    y = np.append(y, mu_y)
-    coordinates = list(zip(x, y))
-    return coordinates
-
-
 def animate(n):
-    def get_colors(length):
-        rbg = []
-        for i in range(length):
-            rbg.append(tuple(rng.random(3, )))
-        return rbg
-
     sig_x = 30
     sig_y = 30
     # coordinates = get_coordinates_toy(10, 100, 350, sig_x, sig_y) # 10 is the number of samples
@@ -239,11 +215,34 @@ def animate(n):
     ani.save("ToySearchDaysMany2.gif", writer=animation.PillowWriter(fps=20))
     plt.show()
 
+def plane_crash(u_3d, v_3d, mask, x_coord, y_coord, sigma=10, points=25):
+    coordinates = OceanFlow_utils.get_coordinates_toy(points, x_coord, y_coord, sigma)
+    colors = OceanFlow_utils.get_colors(len(coordinates))
 
-# animate(n=300)
+    _, _, time = np.shape(u_3d)
+
+    tx, ty = [np.zeros([time, len(coordinates)]) for _ in range(2)]
+
+    for i, (x, y) in enumerate(coordinates):
+        movement = OceanFlow_utils.compute_movement(x, y, u_3d, v_3d, time)
+        tx[:, i] = movement[:, 0]
+        ty[:, i] = movement[:, 1]
+
+    fig, ax = plt.subplots()
+    ax.scatter([], [])
+    ax.imshow(mask, alpha=0.5, cmap='ocean', aspect='auto')
+
+    def animate2(i):
+        ax.set_title(f"T = {i + 1}, var_xy = {sigma}")
+        ax.scatter(tx[i, :], ty[i, :], c=colors, s=2)
+        return ax
+
+    ani = animation.FuncAnimation(fig, animate2, frames=time, interval=50, repeat=False)
+    ani.save("PlaneSearch.gif", writer=animation.PillowWriter(fps=10))
+    plt.show()
 
 
-def find_dipoles(arr1, arr2, mask, plot=False):
+def find_dipoles(u_3d, v_3d, mask, plot=False):
     """Returns a dictionary of points (keys) and coefficients (values) that are highly correlated or anti-correlated
 
     Runs the following algorithm 100,000 times
@@ -269,16 +268,15 @@ def find_dipoles(arr1, arr2, mask, plot=False):
         return (np.corrcoef(point_vec_1, point_vec_2)[0, 1]).round(2)
 
     samples = range(100000)
-    rng = default_rng(12345)
     correlations_dict = {}
-    rows, cols, time = np.shape(arr1)
+    rows, cols, time = np.shape(u_3d)
     for _ in samples:
         col_index_1 = rng.integers(low=0, high=cols)  # This is the x direction (left-right). 555 columns
         col_index_2 = rng.integers(low=0, high=cols)
         row_index_1 = rng.integers(low=0, high=rows)  # This is the y direction (top-bottom). 504 rows
         row_index_2 = rng.integers(low=0, high=rows)
-        point_vec_a = arr1[row_index_1, col_index_1, :]
-        point_vec_b = arr1[row_index_2, col_index_2, :]
+        point_vec_a = u_3d[row_index_1, col_index_1, :]
+        point_vec_b = u_3d[row_index_2, col_index_2, :]
         # The reason this is y then x is the array is indexed by rows, columns
         # and the y direction specifies the # of rows and x direction the # of columns
 
@@ -292,8 +290,8 @@ def find_dipoles(arr1, arr2, mask, plot=False):
                   abs(row_index_1 - row_index_2) > 10]
 
         if np.all(cutoff):
-            point_vec_c = arr2[row_index_1, col_index_1, :]
-            point_vec_d = arr2[row_index_2, col_index_2, :]
+            point_vec_c = v_3d[row_index_1, col_index_1, :]
+            point_vec_d = v_3d[row_index_2, col_index_2, :]
             corr2 = compute_correlations(point_vec_c, point_vec_d)
 
             if abs(corr2) > .90 and np.sign(corr1) == np.sign(corr2):
@@ -350,11 +348,12 @@ def main():
         1. Tries to load numpy arrays from saved files. If not found, calls load_save_data from OceanFlow_utils
         2. Calls the ocean_streamplot function to create and save a streamplot of the flow data"""
     try:
-        u_3d, v_3d, mask = np.load("u_3d.npy"), np.load("v_3d.npy"), np.load("mask.npy").astype('bool')
+        uv_mask_data = np.load("u_3d.npy"), np.load("v_3d.npy"), np.load("mask.npy").astype('bool')
     except FileNotFoundError:
         OceanFlow_utils.load_save_data()
-        u_3d, v_3d, mask = np.load("u_3d.npy"), np.load("v_3d.npy"), np.load("mask.npy").astype('bool')
+        uv_mask_data= np.load("u_3d.npy"), np.load("v_3d.npy"), np.load("mask.npy").astype('bool')
 
+    u_3d, v_3d, mask = uv_mask_data
     size_extent_dict = OceanFlow_utils.get_3d_size_extent(u_3d)
     rows = size_extent_dict["rows"]
     columns = size_extent_dict["columns"]
@@ -370,18 +369,16 @@ def main():
     # -------------------------------------------------------------------------------------------------------------#
 
     # TODO Commenting this out for now because it takes a long time to run. Uncomment for final version ###
-    # ocean_streamplots(u_3d, v_3d, mask)
+    # ocean_streamplots(*uv_mask_data)
 
     # -------------------------------------------------------------------------------------------------------------#
+    # TODO Commenting this out for now because it takes a long time to run. Uncomment for final version ###
+    # correlations = find_dipoles(*uv_mask_data, plot=True)
 
-    correlations = find_dipoles(u_3d, v_3d, mask, plot=True)
+    # -------------------------------------------------------------------------------------------------------------#
+    # TODO Commenting this out for now because it takes a long time to run. Uncomment for final version ###
+    # plane_crash(*uv_mask_data, 400, 400)
 
-
-
-    # fig, ax = plt.subplots()
-    # ax.imshow(mask, alpha=0.5, cmap='ocean', aspect='auto')
-    # ax.scatter([100, 100], [500, 200])
-    # plt.show()
     # -------------------------------------------------------------------------------------------------------------#
 
 
