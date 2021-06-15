@@ -70,16 +70,6 @@ def compute_movement(x_current, y_current, u_3d, v_3d, time):
     return movement_summary
 
 
-# def get_coordinates(length):
-#     coordinates = []
-#     for i in range(length):
-#         x = rng.integers(low=0, high=554, endpoint=True)
-#         y = rng.integers(low=0, high=503, endpoint=True)
-#         if u_array[x, y, 0] != 0 and v_array[x, y, 0] != 0:
-#             coordinates.append((x, y))
-#     return coordinates
-
-
 def get_coordinates_toy(length, mu_x, mu_y, var_xy):
     x = rng.normal(mu_x, var_xy, length - 1)
     x = np.append(x, mu_x)

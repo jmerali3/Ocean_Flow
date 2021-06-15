@@ -184,39 +184,18 @@ def heatmap(K):
         plt.show()
 
 
-def animate(n):
-    sig_x = 30
-    sig_y = 30
-    # coordinates = get_coordinates_toy(10, 100, 350, sig_x, sig_y) # 10 is the number of samples
-    # Can use either get_coordinates or get_coordinates_toy depending on what you want
-    coordinates = get_coordinates(50)
-    colors = get_colors(len(coordinates))
 
-    tx, ty = [np.zeros([n, len(coordinates)]) for _ in range(2)]
-
-    for i, (x, y) in enumerate(coordinates):
-        movement = compute_movement_extended(x, y, n)  # n is number of days
-        tx[:, i] = movement[:, 0]
-        ty[:, i] = movement[:, 1]
-
-    fig, ax = plt.subplots()
-    # ax.set_xlim([0, 554])
-    # ax.set_ylim([0, 503])
-    ax.set_xlim([0, 250])
-    ax.set_ylim([250, 503])
-    ax.scatter([], [])
-
-    def animate2(i):
-        ax.set_title(f"T = {i + 1}, var_x = {sig_x}, var_y = {sig_y}")
-        ax.scatter(tx[i, :], ty[i, :], c=colors, s=2)
-        return ax
-
-    ani = animation.FuncAnimation(fig, animate2, frames=n, interval=50, repeat=False)
-    ani.save("ToySearchDaysMany2.gif", writer=animation.PillowWriter(fps=20))
-    plt.show()
-
-def plane_crash(u_3d, v_3d, mask, x_coord, y_coord, sigma=10, points=25):
-    coordinates = OceanFlow_utils.get_coordinates_toy(points, x_coord, y_coord, sigma)
+def plane_crash(u_3d, v_3d, mask, plane_crash_coordinates, variance=10, num_points=25):
+    """Given an x and y input at t = 0, simulates the flow of a theoretical 'plane crash'
+    Hypothetically, if a plane were to crash into the ocean at point (x,y), where would you look for the part?
+    This simulation will create an animation that shows you where to look at a given time step (PlaneSearch.gif)
+    First, it creates num_points # of random coordinates that are distributed randomly according to a Gaussian
+    distribution specified by mu_x, mu_y, and variance (sigma is assumed to be the same for x and y directions).
+    It then computes the flow path of each of those points using the utility function compute_movement
+    Plots the resulting data on top of the mask and animates it for 100 time steps
+    """
+    mu_x, mu_y = plane_crash_coordinates
+    coordinates = OceanFlow_utils.get_coordinates_toy(num_points, mu_x, mu_y, variance)
     colors = OceanFlow_utils.get_colors(len(coordinates))
 
     _, _, time = np.shape(u_3d)
@@ -233,7 +212,7 @@ def plane_crash(u_3d, v_3d, mask, x_coord, y_coord, sigma=10, points=25):
     ax.imshow(mask, alpha=0.5, cmap='ocean', aspect='auto')
 
     def animate2(i):
-        ax.set_title(f"T = {i + 1}, var_xy = {sigma}")
+        ax.set_title(f"T = {i + 1}, mu_x = {mu_x}, mu_y = {mu_y}, var_xy = {variance}")
         ax.scatter(tx[i, :], ty[i, :], c=colors, s=2)
         return ax
 
@@ -243,7 +222,7 @@ def plane_crash(u_3d, v_3d, mask, x_coord, y_coord, sigma=10, points=25):
 
 
 def find_dipoles(u_3d, v_3d, mask, plot=False):
-    """Returns a dictionary of points (keys) and coefficients (values) that are highly correlated or anti-correlated
+    """Returns a dictionary of dipoles (keys) and  correlation coefficients (values)
 
     Runs the following algorithm 100,000 times
     1. Create 4 random integers within the bounds of the grid
@@ -259,6 +238,8 @@ def find_dipoles(u_3d, v_3d, mask, plot=False):
     5. If those are met, compute the correlation coefficient at the same spot for the ‘v’ vector
         i. If the absolute value of the correlation coefficient is > .9, then add to dictionary
     6. Key = (x1, y1, x2, y2), value = (u_corr_coeff, v_corr_coeff)
+        i. Can be positively or negatively correlated
+    7. If plot, plots the dipoles on the map with a + or - sign if they are positively or negatively correlated
     """
 
     def compute_correlations(point_vec_1, point_vec_2):
@@ -311,7 +292,6 @@ def find_dipoles(u_3d, v_3d, mask, plot=False):
         plt.show()
 
     return correlations_dict
-
 
 
 def ocean_streamplots(u, v, mask):
@@ -377,7 +357,8 @@ def main():
 
     # -------------------------------------------------------------------------------------------------------------#
     # TODO Commenting this out for now because it takes a long time to run. Uncomment for final version ###
-    # plane_crash(*uv_mask_data, 400, 400)
+    plane_crash_coordinates = [400, 400]
+    plane_crash(*uv_mask_data, plane_crash_coordinates)
 
     # -------------------------------------------------------------------------------------------------------------#
 
