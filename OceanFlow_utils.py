@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import seaborn as sns
 
+
 # Utility functions for loading, saving, and analyzing Ocean Flow data
 
 def load_save_data():
@@ -42,6 +43,14 @@ def create_mask_image(mask, filename):
 
 def calc_velocity(u, v):
     return np.sqrt(np.square(u) + np.square(v))
+
+
+def get_3d_size_extent(array):
+    """Calculates the shape of the array and creates a tuple of 'extent' to be used in imshow plotting"""
+    rows, columns, time = np.shape(array)
+    #extent = (0, columns, 0, rows)  # left, right, bottom, top
+    extent = (-0.5, columns - 0.5, -0.5, rows - 0.5)
+    return {"rows": rows, "columns": columns, "time": time, "extent": extent}
 
 
 def compute_movement(x_current, y_current):

@@ -255,8 +255,8 @@ def get_corr_dict(arr1, arr2):
     3. Compute the correlation for these ‘u’ grid vectors
     4. Cutoff criteria
         i. If the absolute value of the correlation coefficient is > .9
-        ii. x distances are greater than 5 grid units
-        iii. y distances are greater than 5 grid units
+        ii. x distances are greater than 10 grid units (30 km)
+        iii. y distances are greater than 10 grid units (30 km)
     5. If those are met, compute the correlation coefficient at the same spot for the ‘v’ vector
         i. If the absolute value of the correlation coefficient is > .9, then add to dictionary
     6. Key = (x1, y1, x2, y2), value = (u_corr_coeff, v_corr_coeff)
@@ -264,7 +264,7 @@ def get_corr_dict(arr1, arr2):
 
     def compute_correlations(point_vec_1, point_vec_2):
         """arr is a 1D array (1x100) for point x,y for times T = 1 - 100"""
-        if np.array_equal(point_vec_1, point_vec_2):
+        if np.all(point_vec_1) == 0.0 or np.all(point_vec_2) == 0.0:
             return 0
         return (np.corrcoef(point_vec_1, point_vec_2)[0, 1]).round(2)
 
@@ -272,83 +272,81 @@ def get_corr_dict(arr1, arr2):
     rng = default_rng(12345)
     correlations_dict = {}
     for _ in samples:
-        x_rand1 = rng.integers(low=0, high=554, endpoint=True)
-        x_rand2 = rng.integers(low=0, high=554, endpoint=True)
-        y_rand1 = rng.integers(low=0, high=503, endpoint=True)
-        y_rand2 = rng.integers(low=0, high=503, endpoint=True)
-        point_vec_A = arr1[x_rand1, y_rand1, :]
-        point_vec_B = arr1[x_rand2, y_rand2, :]
+        col_index_1 = rng.integers(low=0, high=555)  # This is the x direction (left-right). 555 columns
+        col_index_2 = rng.integers(low=0, high=555)
+        row_index_1 = rng.integers(low=0, high=504)  # This is the y direction (top-bottom). 504 rows
+        row_index_2 = rng.integers(low=0, high=504)
+        point_vec_A = arr1[row_index_1, col_index_1, :]
+        point_vec_B = arr1[row_index_2, col_index_2, :]
+        # The reason this is y then x is the array is indexed by rows, columns
+        # and the y direction specifies the # of rows and x direction the # of columns
 
-        if point_vec_A.all() == 0 or point_vec_B.all() == 0:
+        if point_vec_A.all() == 0.0 or point_vec_B.all() == 0.0:
             continue
 
         corr1 = compute_correlations(point_vec_A, point_vec_B)
 
-        cutoff = [abs(corr1) > .9,
-                  (x_rand1 - x_rand2) > 5,
-                  (y_rand1 - y_rand2) > 5]
+        cutoff = [abs(corr1) > .90,
+                  abs(col_index_1 - col_index_2) > 10,
+                  abs(row_index_1 - row_index_2) > 10]
 
         if np.all(cutoff):
-            point_vec_C = arr2[x_rand1, y_rand1, :]
-            point_vec_D = arr2[x_rand2, y_rand2, :]
+            point_vec_C = arr2[row_index_1, col_index_1, :]
+            point_vec_D = arr2[row_index_2, col_index_2, :]
             corr2 = compute_correlations(point_vec_C, point_vec_D)
 
-            if abs(corr2) > .9:
-                key = (x_rand1, y_rand1, x_rand2, y_rand2)
+            if abs(corr2) > .90 and np.sign(corr1) == np.sign(corr2):
+                key = (col_index_1, row_index_1, col_index_2, row_index_2)
                 correlations_dict[key] = (corr1, corr2)
     return correlations_dict
 
 
-# correlations = get_corr_dict(u_array, v_array)
-
-# for key, value in correlations.items():
-#     x1, y1, x2, y2 = key
-#     corr1, corr2 = value
-#     print(f"Point 1: ({x1},{y1}); Point 2: ({x2},{y2}); u-corr: {corr1}; v-corr: {corr2}")
-
-
-# print(u_array[358, 87, :])
-# print(u_array[98, 6, :])
-# print(v_array[358, 87, :])
-# print(v_array[98, 6, :])
-
 
 def ocean_streamplots(u, v, mask):
-    """Plots & animates the velocity-weighted  flow using Matplotlib Streamplots with a mask background
+    """Plots & animates the velocity-weighted flow using Matplotlib Streamplots with a mask background
     There is still a bug in the code that makes the gif resize at certain time points, but it's time to move on for now
     """
-    rows, columns, time = np.shape(u)
-    x = np.arange(columns)
-    y = np.arange(rows)
+    # TODO I think the flows are wrong because the y-axis is flipped. Modify extents. Make sure x and y direction are correct
+    size_dict = OceanFlow_utils.get_3d_size_extent(u)
+    x = np.arange(size_dict["columns"])
+    y = np.arange(size_dict["rows"])
     fig, ax = plt.subplots()
 
     def stream_animate(t):
         """Returns streamplot at time = t to be used by FuncAnimation"""
         plt.cla()
         plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-        ax.imshow(mask, alpha=0.5, cmap='ocean', aspect=columns/rows)
+        ax.imshow(mask, extent=size_dict["extent"], alpha=0.5, cmap='ocean') #aspect=columns/rows)
         ax.set_aspect('equal')
         u_m = np.ma.array(u[:, :, t], mask=~mask)
         v_m = np.ma.array(v[:, :, t], mask=~mask)
         velocity = OceanFlow_utils.calc_velocity(u_m, v_m)
-        ax.set_title(f"Streamplots at t={t}")
+        ax.set_title(f"Velocity-Weighted Streamplot at t={t}")
         lw = 4 * velocity / velocity.max()
         ax.streamplot(x, y, u_m, v_m, density=2, linewidth=lw)
         fig.tight_layout()
         return ax
 
-    ani = animation.FuncAnimation(fig, stream_animate, frames=time, interval=200, repeat=False)
+    ani = animation.FuncAnimation(fig, stream_animate, frames=size_dict["time"], interval=200, repeat=False)
     ani.save("Streamplots.gif", writer=animation.PillowWriter(fps=4))
     plt.show()
 
 
 def main():
+    """ [Insert description
+        1. Tries to load numpy arrays from saved files. If not found, calls load_save_data from OceanFlow_utils
+        2. Calls the ocean_streamplot function to create and save a streamplot of the flow data"""
     try:
         u_3d, v_3d, mask = np.load("u_3d.npy"), np.load("v_3d.npy"), np.load("mask.npy").astype('bool')
     except FileNotFoundError:
         OceanFlow_utils.load_save_data()
         u_3d, v_3d, mask = np.load("u_3d.npy"), np.load("v_3d.npy"), np.load("mask.npy").astype('bool')
 
+    size_extent_dict = OceanFlow_utils.get_3d_size_extent(u_3d)
+    rows = size_extent_dict["rows"]
+    columns = size_extent_dict["columns"]
+
+    # TODO May not need this because imshow can plot with mask
     filename = "mask.png"
     try:
         mask_image = Image.open(filename)
@@ -356,9 +354,25 @@ def main():
         OceanFlow_utils.create_mask_image(mask, filename)
         mask_image = Image.open(filename)
 
-    ### Commenting this out because it takes a long time to run. Uncomment for final version
-    ocean_streamplots(u_3d, v_3d, mask)
-    ###
+    ### Commenting this out because it takes a long time to run. Uncomment for final version ###
+    # ocean_streamplots(u_3d, v_3d, mask)
+
+    correlations = get_corr_dict(u_3d, v_3d)
+    fig, ax = plt.subplots()
+    ax.imshow(mask, extent=size_extent_dict["extent"], alpha=0.5, cmap='ocean', aspect='auto')
+    for key, value in correlations.items():
+        col_index_1, row_index_1, col_index_2, row_index_2 = key
+        x1, x2 = col_index_1, col_index_2
+        y1, y2 = rows - row_index_1, rows - row_index_2
+        corr_u, corr_v = value
+        print(f"Point 1: ({x1},{y1}); Point 2: ({x2},{y2}); "
+              f"u-corr coefficient: {corr_u}; v-corr coefficient: {corr_v}")
+        marker = "+" if corr_u > 0 else "_"
+        ax.scatter([x1, y1], [x2, y2], marker=marker)
+
+    plt.show()
+
+
 
     # x_start = 50
     # y_start = 300
