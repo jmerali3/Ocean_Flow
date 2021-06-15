@@ -243,7 +243,7 @@ def animate(n):
 # animate(n=300)
 
 
-def get_corr_dict(arr1, arr2):
+def find_dipoles(arr1, arr2, mask, plot=False):
     """Returns a dictionary of points (keys) and coefficients (values) that are highly correlated or anti-correlated
 
     Runs the following algorithm 100,000 times
@@ -271,33 +271,47 @@ def get_corr_dict(arr1, arr2):
     samples = range(100000)
     rng = default_rng(12345)
     correlations_dict = {}
+    rows, cols, time = np.shape(arr1)
     for _ in samples:
-        col_index_1 = rng.integers(low=0, high=555)  # This is the x direction (left-right). 555 columns
-        col_index_2 = rng.integers(low=0, high=555)
-        row_index_1 = rng.integers(low=0, high=504)  # This is the y direction (top-bottom). 504 rows
-        row_index_2 = rng.integers(low=0, high=504)
-        point_vec_A = arr1[row_index_1, col_index_1, :]
-        point_vec_B = arr1[row_index_2, col_index_2, :]
+        col_index_1 = rng.integers(low=0, high=cols)  # This is the x direction (left-right). 555 columns
+        col_index_2 = rng.integers(low=0, high=cols)
+        row_index_1 = rng.integers(low=0, high=rows)  # This is the y direction (top-bottom). 504 rows
+        row_index_2 = rng.integers(low=0, high=rows)
+        point_vec_a = arr1[row_index_1, col_index_1, :]
+        point_vec_b = arr1[row_index_2, col_index_2, :]
         # The reason this is y then x is the array is indexed by rows, columns
         # and the y direction specifies the # of rows and x direction the # of columns
 
-        if point_vec_A.all() == 0.0 or point_vec_B.all() == 0.0:
+        if point_vec_a.all() == 0.0 or point_vec_b.all() == 0.0:
             continue
 
-        corr1 = compute_correlations(point_vec_A, point_vec_B)
+        corr1 = compute_correlations(point_vec_a, point_vec_b)
 
         cutoff = [abs(corr1) > .90,
                   abs(col_index_1 - col_index_2) > 10,
                   abs(row_index_1 - row_index_2) > 10]
 
         if np.all(cutoff):
-            point_vec_C = arr2[row_index_1, col_index_1, :]
-            point_vec_D = arr2[row_index_2, col_index_2, :]
-            corr2 = compute_correlations(point_vec_C, point_vec_D)
+            point_vec_c = arr2[row_index_1, col_index_1, :]
+            point_vec_d = arr2[row_index_2, col_index_2, :]
+            corr2 = compute_correlations(point_vec_c, point_vec_d)
 
             if abs(corr2) > .90 and np.sign(corr1) == np.sign(corr2):
                 key = (col_index_1, row_index_1, col_index_2, row_index_2)
                 correlations_dict[key] = (corr1, corr2)
+    if plot:
+        fig, ax = plt.subplots()
+        ax.imshow(mask, alpha=0.5, cmap='ocean', aspect='auto')
+        for key, value in correlations_dict.items():
+            x1, y1, x2, y2 = key
+            corr_u, corr_v = value
+            print(f"Point 1: ({x1},{y1}); Point 2: ({x2},{y2}); "
+                  f"u-corr coefficient: {corr_u}; v-corr coefficient: {corr_v}")
+            marker = "+" if corr_u > 0 else "_"
+            ax.scatter([x1, x2], [y1, y2], marker=marker, s=80)
+        plt.savefig("Dipole.png", format='png', transparent=True)
+        plt.show()
+
     return correlations_dict
 
 
@@ -306,7 +320,6 @@ def ocean_streamplots(u, v, mask):
     """Plots & animates the velocity-weighted flow using Matplotlib Streamplots with a mask background
     There is still a bug in the code that makes the gif resize at certain time points, but it's time to move on for now
     """
-    # TODO I think the flows are wrong because the y-axis is flipped. Modify extents. Make sure x and y direction are correct
     size_dict = OceanFlow_utils.get_3d_size_extent(u)
     x = np.arange(size_dict["columns"])
     y = np.arange(size_dict["rows"])
@@ -316,7 +329,7 @@ def ocean_streamplots(u, v, mask):
         """Returns streamplot at time = t to be used by FuncAnimation"""
         plt.cla()
         plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-        ax.imshow(mask, extent=size_dict["extent"], alpha=0.5, cmap='ocean') #aspect=columns/rows)
+        ax.imshow(mask, alpha=0.5, cmap='ocean', aspect='auto')
         ax.set_aspect('equal')
         u_m = np.ma.array(u[:, :, t], mask=~mask)
         v_m = np.ma.array(v[:, :, t], mask=~mask)
@@ -333,7 +346,7 @@ def ocean_streamplots(u, v, mask):
 
 
 def main():
-    """ [Insert description
+    """ [Insert description]
         1. Tries to load numpy arrays from saved files. If not found, calls load_save_data from OceanFlow_utils
         2. Calls the ocean_streamplot function to create and save a streamplot of the flow data"""
     try:
@@ -346,6 +359,7 @@ def main():
     rows = size_extent_dict["rows"]
     columns = size_extent_dict["columns"]
 
+    # -------------------------------------------------------------------------------------------------------------#
     # TODO May not need this because imshow can plot with mask
     filename = "mask.png"
     try:
@@ -353,25 +367,22 @@ def main():
     except FileNotFoundError:
         OceanFlow_utils.create_mask_image(mask, filename)
         mask_image = Image.open(filename)
+    # -------------------------------------------------------------------------------------------------------------#
 
-    ### Commenting this out because it takes a long time to run. Uncomment for final version ###
+    # TODO Commenting this out for now because it takes a long time to run. Uncomment for final version ###
     # ocean_streamplots(u_3d, v_3d, mask)
 
-    correlations = get_corr_dict(u_3d, v_3d)
-    fig, ax = plt.subplots()
-    ax.imshow(mask, extent=size_extent_dict["extent"], alpha=0.5, cmap='ocean', aspect='auto')
-    for key, value in correlations.items():
-        col_index_1, row_index_1, col_index_2, row_index_2 = key
-        x1, x2 = col_index_1, col_index_2
-        y1, y2 = rows - row_index_1, rows - row_index_2
-        corr_u, corr_v = value
-        print(f"Point 1: ({x1},{y1}); Point 2: ({x2},{y2}); "
-              f"u-corr coefficient: {corr_u}; v-corr coefficient: {corr_v}")
-        marker = "+" if corr_u > 0 else "_"
-        ax.scatter([x1, y1], [x2, y2], marker=marker)
+    # -------------------------------------------------------------------------------------------------------------#
 
-    plt.show()
+    correlations = find_dipoles(u_3d, v_3d, mask, plot=True)
 
+
+
+    # fig, ax = plt.subplots()
+    # ax.imshow(mask, alpha=0.5, cmap='ocean', aspect='auto')
+    # ax.scatter([100, 100], [500, 200])
+    # plt.show()
+    # -------------------------------------------------------------------------------------------------------------#
 
 
     # x_start = 50
