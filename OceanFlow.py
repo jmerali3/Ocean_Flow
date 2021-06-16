@@ -162,74 +162,48 @@ def parameter_optimization(direction):
     plt.show()
 
 
-def heatmap(K):
+def kernel_heatmap(K, sig2):
+    K = K
     mask = np.zeros_like(K)
     mask[np.triu_indices_from(mask)] = True
     with sns.axes_style("white"):
         f, ax = plt.subplots()
-        ax = sns.heatmap(K, mask=mask, square=True, cmap="YlGnBu")
+        ax = sns.heatmap(K, mask=mask, square=True, cmap="YlGnBu", vmax=sig2)
         plt.show()
 
 
-def compute_kernel(arr, l_sq, sig_sq, arr2=None):
+def compute_kernel(arr1, l2, sig2, arr2=None):
     """ This computes the kernel between the INDICES of train and test, not the labels.
      The idea is that closer indices (x-axis) leads to higher covariance
-      arr is 2D"""
-    if arr2 is not None:
-        l1 = len(arr)
-        l2 = len(arr2)
-    else:
-        l1 = l2 = len(arr)
-        arr2 = arr
-
-    K = np.zeros([l1, l2])
-    for i in range(l1):
-        for j in range(l2):
-            K[i, j] = sig_sq * np.exp((arr[i] - arr2[j]) ** 2 / -l_sq)
+    """
+    arr2 = arr1 if arr2 is None else arr2
+    len1, len2 = len(arr1), len(arr2)
+    K = np.zeros([len1, len2])
+    for i in range(len1):
+        for j in range(len2):
+            K[i, j] = sig2 * np.exp((arr1[i] - arr2[j]) ** 2 / -l2)
     return K
 
 
-def plot_crash_coordinates_gauss(u_3d, v_3d, plane_crash_coordinates, sigma=.5):
-    # TODO Make into subplots
+def plot_crash_coordinates_gauss(u_3d, v_3d, plane_crash_coordinates, hyperparameters):
+    l2 = hyperparameters["l2"]
+    sig2 = hyperparameters["sig2"]
+    fig, axes = plt.subplots(nrows=1, ncols=2, sharex=True, sharey=True)
     x, y = plane_crash_coordinates
-    for array, dir, color in zip([u_3d, v_3d], ["U", "V"], ['b', 'r']):
+    for array, dir, color, ax, l, s in zip([u_3d, v_3d], ["U", "V"], ['b', 'r'], axes, l2, sig2):
         velocity = array[x, y, :]
         t = len(velocity)
         time = np.arange(t)
-        mean_y = 0
-        plt.plot(time, velocity, c=color, linewidth=1.5)
-        y_gauss = rng.normal(mean_y, sigma, size=[t,3])
-        plt.plot(time, y_gauss, linewidth=.75)
-        plt.fill_between(time, mean_y - sigma, mean_y + sigma, alpha=0.2, color='k')
-        plt.xlim(0, t)
-        # gp = GaussianProcessRegressor(kernel=RBF)
-        # x_prior = np.linspace(0, t, t)
-        # print(x_prior[:, np.newaxis])
-        # y_mean, y_std = gp.predict(x_prior[:, np.newaxis], return_std=True)
-        # plt.plot(x_prior, y_mean, 'k', lw=.75, zorder=9)
-        # plt.fill_between(x_prior, y_mean - y_std, y_mean + y_std, alpha=0.2, color='k')
-        # y_samples = gp.sample_y(x_prior[:, np.newaxis], 10)
-        # plt.plot(x_prior, y_samples, lw=1)
-        # plt.xlim(0, t)
-        # plt.ylim(-3, 3)
-        title = f"{dir} Gaussian Prior for [{x}, {y}], mean = {mean_y}, sigma = {sigma}"
-        plt.title(title)
-        plt.savefig(f"OceanFlowImages/{dir}_direction_velocity_gauss.png", format="png")
-        plt.show()
-
-
-def plot_crash_coordinates(u_3d, v_3d, plane_crash_coordinates):
-    # TODO Make into subplots
-    x, y = plane_crash_coordinates
-    for array, dir, color in zip([u_3d, v_3d], ["U", "V"], ['b', 'r']):
-        velocity = array[x, y, :]
-        time = np.arange(len(velocity))
-        plt.plot(time, velocity, c=color, linewidth=1.5)
-        title = f"{dir} Direction Velocity Over Time at [{x}, {y}]"
-        plt.title(title)
-        plt.savefig(f"OceanFlowImages/{dir}_direction_velocity.png", format="png")
-        plt.show()
-
+        n = len(velocity)
+        K_ss = compute_kernel(time, l, s)
+        L = np.linalg.cholesky(K_ss + 1e-15 * np.eye(n))
+        f_prior = np.dot(L, rng.normal(size=(n, 3)))
+        ax.plot(time, velocity, c=color, linewidth=1.5)
+        ax.plot(time, f_prior, linewidth=.75)
+        ax.set_title(f"{dir} Direction; l2 = {l}, sig2 = {s}")
+    plt.suptitle(f"Gaussian Prior for [{x}, {y}]")
+    plt.savefig(f"OceanFlowImages/gaussian_prior.png", format="png")
+    plt.show()
 
 
 def plane_crash(u_3d, v_3d, mask, plane_crash_coordinates, variance=10, num_points=25):
@@ -378,7 +352,7 @@ def main():
         uv_mask_data = np.load("u_3d.npy"), np.load("v_3d.npy"), np.load("mask.npy").astype('bool')
     except FileNotFoundError:
         OceanFlow_utils.load_save_data()
-        uv_mask_data= np.load("u_3d.npy"), np.load("v_3d.npy"), np.load("mask.npy").astype('bool')
+        uv_mask_data = np.load("u_3d.npy"), np.load("v_3d.npy"), np.load("mask.npy").astype('bool')
 
     u_3d, v_3d, mask = uv_mask_data
     size_extent_dict = OceanFlow_utils.get_3d_size_extent(u_3d)
@@ -408,40 +382,58 @@ def main():
     # that shows where the flow possibly took the parts as a function of the timestep and assumed variance
     # TODO Commenting this out for now because it takes a long time to run. Uncomment for final version ###
     plane_crash_coordinates = [400, 400]
-
     # plane_crash(*uv_mask_data, plane_crash_coordinates)
 
+    # -------------------------------------------------------------------------------------------------------------#
+    # The time steps are quite far apart, so you want to interpolate between seemingly random signals. How do you do
+    # this? Regression methods are parametric and random noise is infinitely parametric. Where would you even begin?
+    # Enter Gaussian Process, a non-parametric approach that "defines a prior over functions, which can be converted
+    # into a posterior over functions once we have seen some data"
+    #
+    # Ocean flow is a great candidate for being modeled by a Gaussian process because the noisy signal requires a
+    # more unconstrained approach to modeling than any regression could provide. Ocean flow is a function of numerous
+    # random elements like temperature, barometric pressure, cloud cover, etc. The sum off all these --> Gaussian
 
-    # The time steps are quite far apart, so you want to interpolate.
-    # How do you do this? This is too random for regression methods, and we would like a measure of
-    # uncertainty. Enter Gaussian Process. We know this is random, and so our "prior" estimate is just a Gaussian
-    # with mean = 0. However, we do have some data, so we can update our priors, this Gaussian model, to fit the data
-    # and we can add error bands. The key assumption here is that points close in time indices should be correlated
-    # with each other. This means we can use a kernel method to to calculate the covariance matrix between each point
-    # in time.
+    # Our "prior" estimate before any data is observed is just a Gaussian distribution with mean = 0 and an arbitrary
+    # covariance between points. This covariance matrix can be approximated by a what's called a Kernel, which gives
+    # us a measure of "similarity" between all points in a set. There are certain hyperparameters,
+    # namely the length scale l^2 and sig^2 (get name) that define the Kernel.
+    # For this example, we will use the radial basis function (RBF) kernel because it is infinitely differentiable
+    # (scaled to infinite dimension) and fits noisy models really well.
+    # The key assumption here is that points close in time indices should be correlated with each other. Therefore,
+    # if we know the flow at say times t = 4 and t = 5, we figure the flow at t = 4.5 will be somewhere in between.
+    # And t=4.5 also has some decaying dependence on t = 3, t = 2, etc. We need to map this covariance somehow
+    # Th next step will be to optimize the model by finding the best hyperparamters.
+
+    # First, let's get a sense of what the prior distribution look slike with arbitrary l2 and s2
+
+    l2, sig2 = (10, 1), (.1, 1)
+    hyperparameters = {"l2": l2, "sig2": sig2}
+    # plot_crash_coordinates_gauss(u_3d, v_3d, plane_crash_coordinates, hyperparameters)
+
+    # It's clear that a higher length scale smooth smooths out the curves and a lower sigma makes the distribution
+    # tighter. This model assumed the mean = 0, which is clearly not the case. We can incorporate our measurement data
+    # and find a posterior Gaussian model.
+
+    # -------------------------------------------------------------------------------------------------------------#
+
 
     # Isolate the data to only look at a 2D array at the specified crash point instead of the entire set
     crash_u = u_3d[plane_crash_coordinates[0], plane_crash_coordinates[1], :]
     crash_v = v_3d[plane_crash_coordinates[0], plane_crash_coordinates[1], :]
 
-    # First, let's simply plot the flows as a function of time
-    #plot_crash_coordinates(u_3d, v_3d, plane_crash_coordinates)
-
-    # Next, let's add a Gaussian distribution with mean = 0 over the time steps and an arbitrary standard
-    # deviation of .5. This is the "prior" function before our Gaussian process has seen any data besides the overall
-    # average of the data. The key assumption
-    # here is that each point in time is distributed about the mean over the entire set. However, that's not entirely
-    # true. Points close to each other should have some covariance with each other
-
-    plot_crash_coordinates_gauss(u_3d, v_3d, plane_crash_coordinates)
+    # Let's dive deeper into the Kernel function and what it is telling us
+    # The kernel function will input an Nx1 matrix and return a symmetric NxN matrix with all diagonals = 1
+    # and each i,j entry is the covariance between points i,j
+    kernel_crash_u = compute_kernel(crash_u, l2[0], sig2[0])
+    kernel_crash_v = compute_kernel(crash_v, l2[1], sig2[1])
+    #Let's visualize this
+    kernel_heatmap(kernel_crash_u, sig2[0])
+    kernel_heatmap(kernel_crash_v, sig2[1])
 
     # We could obviously improve this if we could model the covariance of the points
 
     # Note, that in this example, all the data points are equally spaced, but that need not be true.
-
-
-
-
 
 
 if __name__ == "__main__":
