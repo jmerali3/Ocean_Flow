@@ -9,36 +9,21 @@ from PIL import Image
 import OceanFlow_utils
 
 rng = default_rng(12345)
-
-def compute_kernel(arr, l_sq, sig_sq, arr2=None):
-    # This computes the kernel between the INDICES of train and test, not the labels.
-    # The idea is that closer indices (x-axis) leads to higher covariance
-    if arr2 is not None:
-        l1 = len(arr)
-        l2 = len(arr2)
-    else:
-        l1 = l2 = len(arr)
-        arr2 = arr
-
-    K = np.zeros([l1, l2])
-    for i in range(l1):
-        for j in range(l2):
-            K[i, j] = sig_sq * np.exp((arr[i] - arr2[j]) ** 2 / -l_sq)
-    return K
+plt.style.use("seaborn-whitegrid")
 
 
 def interpolate(arr, n, l2, sig2, tau, plot=False):
     test = np.linspace(0, 100, n)
     train = np.linspace(0, 100, len(arr))
 
-    K_ss = compute_kernel(test, l2, sig2)
+    K_ss = OceanFlow_utils.compute_kernel(test, l2, sig2)
     L = np.linalg.cholesky(K_ss + tau * np.eye(n))
     f_prior = np.dot(L, np.random.normal(size=(n, 3)))
 
-    K = compute_kernel(train, l2, sig2)
+    K = OceanFlow_utils.compute_kernel(train, l2, sig2)
     L = np.linalg.cholesky(K + tau * np.eye(len(train)))
 
-    K_s = compute_kernel(train, l2, sig2, test)
+    K_s = OceanFlow_utils.compute_kernel(train, l2, sig2, test)
     Lk = np.linalg.solve(L, K_s)
     mu = np.dot(Lk.T, np.linalg.solve(L, arr)).reshape((n,))  # This is where labels come in (arr)
 
@@ -95,9 +80,9 @@ def Kfold_function(data, l_sq, sig_sq, tau, plot=False):
         train_labels = data[train]
         test_labels = data[test]
         n = len(test)
-        K_train = compute_kernel(train, l_sq, sig_sq)
-        K_test = compute_kernel(test, l_sq, sig_sq)
-        K_cross = compute_kernel(train, l_sq, sig_sq, arr2=test)
+        K_train = OceanFlow_utils.compute_kernel(train, l_sq, sig_sq)
+        K_test = OceanFlow_utils.compute_kernel(test, l_sq, sig_sq)
+        K_cross = OceanFlow_utils.compute_kernel(train, l_sq, sig_sq, arr2=test)
         L = np.linalg.cholesky(K_train + tau * np.eye(len(train)))
         Lk = np.linalg.solve(L, K_cross)
         mu = np.dot(Lk.T, np.linalg.solve(L, train_labels))
@@ -183,6 +168,17 @@ def heatmap(K):
         ax = sns.heatmap(K, mask=mask, square=True, cmap="YlGnBu")
         plt.show()
 
+
+def plot_crash_coordinates(u_3d, v_3d, plane_crash_coordinates):
+    x, y = plane_crash_coordinates
+    for array, dir, color in zip([u_3d, v_3d], ["U", "V"], ['b', 'r']):
+        velocity = array[x, y, :]
+        time = np.arange(len(velocity))
+        title = f"{dir} Direction Velocity Over Time"
+        plt.plot(time, velocity, c=color)
+        plt.title(title)
+        plt.savefig(f"{dir}_direction_velocity.png", format="png")
+        plt.show()
 
 
 def plane_crash(u_3d, v_3d, mask, plane_crash_coordinates, variance=10, num_points=25):
@@ -358,9 +354,18 @@ def main():
     # -------------------------------------------------------------------------------------------------------------#
     # TODO Commenting this out for now because it takes a long time to run. Uncomment for final version ###
     plane_crash_coordinates = [400, 400]
-    plane_crash(*uv_mask_data, plane_crash_coordinates)
+    # plane_crash(*uv_mask_data, plane_crash_coordinates)
 
     # -------------------------------------------------------------------------------------------------------------#
+    # Say you have this data and a plane crash at 400, 400. The time steps are quite far apart, so you want to
+    # interpolate. How do you do this? This is too random for regression methods, and we would like a measure of
+    # uncertainty. Enter Gaussian Process. We know this is random, and so our "prior" estimate is just a Gaussian
+    # with mean = 0. However, we do have some data, so we can update our priors, this Gaussian model, to fit the data
+    # and we can add error bands. The key assumption here is that points close in time indices should be correlated
+    # with each other. This means we can use a kernel method to to calculate the covariance matrix between each point
+    # in time.
+    plot_crash_coordinates(u_3d, v_3d, plane_crash_coordinates)
+
 
 
     # x_start = 50

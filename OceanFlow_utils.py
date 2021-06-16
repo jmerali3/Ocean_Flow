@@ -84,3 +84,20 @@ def get_colors(length):
     for i in range(length):
         rbg.append(tuple(rng.random(3, )))
     return rbg
+
+
+def compute_kernel(arr, l_sq, sig_sq, arr2=None):
+    """ This computes the kernel between the INDICES of train and test, not the labels.
+     The idea is that closer indices (x-axis) leads to higher covariance """
+    if arr2 is not None:
+        l1 = len(arr)
+        l2 = len(arr2)
+    else:
+        l1 = l2 = len(arr)
+        arr2 = arr
+
+    K = np.zeros([l1, l2])
+    for i in range(l1):
+        for j in range(l2):
+            K[i, j] = sig_sq * np.exp((arr[i] - arr2[j]) ** 2 / -l_sq)
+    return K
