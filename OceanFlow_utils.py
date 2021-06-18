@@ -47,14 +47,6 @@ def calc_velocity(u, v):
     return np.sqrt(np.square(u) + np.square(v))
 
 
-def get_3d_size_extent(array):
-    """Calculates the shape of the array and creates a tuple of 'extent' to be used in imshow plotting"""
-    rows, columns, time = np.shape(array)
-    #extent = (0, columns, 0, rows)  # left, right, bottom, top
-    extent = (-0.5, columns - 0.5, -0.5, rows - 0.5)
-    return {"rows": rows, "columns": columns, "time": time, "extent": extent}
-
-
 def compute_movement(x_current, y_current, u_3d, v_3d, time):
     """Computes new movements and locations for each time step, given x and y initial coordinates"""
     x, y, u, v = [np.zeros(time) for _ in range(4)]
@@ -85,4 +77,32 @@ def get_colors(length):
         rbg.append(tuple(rng.random(3, )))
     return rbg
 
+def get_log_likelihood(posterior, K):
+    log_like = -.5 * posterior.T @ np.linalg.solve(K, posterior)\
+              - .5 * np.log(np.linalg.det(K))\
+              - 10 / 2 * np.log(2 * np.pi)
+    return log_like
 
+
+def compute_kernel(dimension, l2, sig2):
+    """ This computes the kernel between the INDICES of train and test, not the labels.
+     The idea is that closer indices (x-axis) leads to higher covariance
+    """
+    K = np.zeros(np.array(dimension))
+    for i in range(dimension[0]):
+        for j in range(dimension[1]):
+            K[i, j] = sig2 * np.exp((i-j) ** 2 / -l2)
+    return K
+
+
+def compute_data_kernel(array, l2, sig2, tau):
+    """ This computes the kernel between the INDICES of train and test, not the labels.
+     The idea is that closer indices (x-axis) leads to higher covariance
+    """
+    # array_noise =
+    dim = len(array)
+    K = np.zeros([dim, dim])
+    for i in range(dim):
+        for j in range(dim):
+            K[i, j] = sig2 * np.exp((array[i]-array[j]) ** 2 / -l2)
+    return K
