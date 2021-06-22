@@ -178,8 +178,8 @@ def plot_crash_coordinates_gauss_prior(u_3d, v_3d, plane_crash_coordinates, hype
         L = np.linalg.cholesky(K_ss + 1e-15 * np.eye(t))
         f_prior = np.dot(L, rng.normal(size=(t, 3)))
         ax.plot(time, velocity, c=color, linewidth=1.5)
-        ax.plot(time, f_prior, linewidth=.75)
-        ax.set_title(f"{dir} Direction; l2 = {param_l}, sig2 = {param_s}")
+        ax.plot(time, f_prior, linewidth=.75, alpha=.75)
+        ax.set_title(f"{dir} Direction - l2 = {param_l}, sig2 = {param_s}")
     plt.suptitle(f"Gaussian Prior for [{x}, {y}]")
     plt.savefig(f"OceanFlowImages/gaussian_prior.png", format="png")
     plt.show()
@@ -189,7 +189,7 @@ def plot_crash_coordinates_gauss_posterior(u_3d, v_3d, plane_crash_coordinates, 
     """Will only use the first two parameters of l2 and sig2"""
     l2 = hyperparameters["l2"][0:2]
     sig2 = hyperparameters["sig2"][0:2]
-    fig, axes = plt.subplots(nrows=1, ncols=2, sharex=True, sharey=True)
+    fig, axes = plt.subplots(nrows=1, ncols=2)
     x, y = plane_crash_coordinates
     n = 1000
     for array, dir, color, ax, l_param, s_param in zip([u_3d, v_3d], ["U", "V"], ['b', 'r'], axes, l2, sig2):
@@ -208,10 +208,10 @@ def plot_crash_coordinates_gauss_posterior(u_3d, v_3d, plane_crash_coordinates, 
         L = np.linalg.cholesky(K_ss + 1e-6 * np.eye(n) - np.dot(Lk.T, Lk))  # 1000 x 1000
         f_post = mu.reshape(-1, 1) + np.dot(L, np.random.normal(size=(n, 3)))  # 1000 x 3
         ax.plot(Xtrain, Ytrain, c=color, linewidth=1.5)
-        ax.plot(Xtest, f_post, linewidth=.75)
-        ax.set_title(f"{dir} Direction; l2 = {l_param}, sig2 = {s_param}")
-        ax.fill_between(Xtest.flat, mu - 2 * stdv, mu + 2 * stdv, color="#dddddd")
-    plt.suptitle(f"Gaussian Posterior for [{x}, {y}]")
+        ax.plot(Xtest, f_post, linewidth=1)
+        ax.set_title(f"{dir} Direction - l2 = {l_param}, sig2 = {s_param}")
+        ax.fill_between(Xtest.flat, mu - 3 * stdv, mu + 3 * stdv, color="#dddddd")
+    plt.suptitle(f"Gaussian Posterior for [{x}, {y}] +/- 3 Std Devs")
     plt.savefig(f"OceanFlowImages/{filename}.png", format="png")
     plt.show()
 
@@ -241,7 +241,7 @@ def Kfold_function(direction_vec, l2=None, sig2=None, tau=None, hyperparameters=
     """Performs k=20 K-Fold optimization given a set of hyperparameters. These can either be given explicitly with
     l2, sig2, or tau when doing parameter optimization or in dictionary format to keyword hyperparameters. More
     details about this algorithm can be found in the literature C. E. Rasmussen & C. K. I. Williams,
-    Gaussian Processes for Machine Learning, the MIT Press, 2005
+    Gaussian Processes for Machine Learning, the MIT Press, 2006
     :param direction_vec: 2D array (t, velocity) at a specific (x,y) coordinate
     :param l2: length scale
     :param sig2: variance
@@ -359,11 +359,11 @@ def main():
 
     # -------------------------------------------------------------------------------------------------------------#
 
-    ocean_streamplots(*uv_mask_data)
+    #ocean_streamplots(*uv_mask_data)
 
     # -------------------------------------------------------------------------------------------------------------#
 
-    correlations = find_dipoles(*uv_mask_data, plot=True)
+    #correlations = find_dipoles(*uv_mask_data, plot=True)
 
     # -------------------------------------------------------------------------------------------------------------#
 
@@ -371,7 +371,7 @@ def main():
     # that shows where the flow possibly took the parts as a function of the timestep and assumed variance
 
     plane_crash_coordinates = [400, 400]
-    plane_crash(*uv_mask_data, plane_crash_coordinates)
+    #plane_crash(*uv_mask_data, plane_crash_coordinates)
 
     # -------------------------------------------------------------------------------------------------------------#
     # The time steps are quite far apart, so you want to interpolate between seemingly random signals. How do you do
@@ -443,7 +443,7 @@ def main():
     # [Insert explanation about log likelihood]
 
     Kfold_hyperparameters = {"l2": 10, "sig2": .05, "tau": 1e-5}
-    Kfold_LL = Kfold_function(crash_u, Kfold_hyperparameters, plot=False)
+    Kfold_LL = Kfold_function(crash_u, hyperparameters=Kfold_hyperparameters, plot=False)
     print(f"KFold Example - The average log likelihood for l2 = {Kfold_hyperparameters['l2']} and "
           f"sig2 = {Kfold_hyperparameters['l2']} is {Kfold_LL}")
 
