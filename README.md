@@ -4,7 +4,7 @@ The ocean is a wonderous place - it's mystery
 
 
 ### Step 1 - The Data
-The data measures ocean flow velocity in U (east-west) and V (north-south) directions in an approximately 1500 km x 1500 km grid in the Philippines.
+The data measures ocean flow velocity in U (east-west) and V (north-south) directions in an approximately 1500 km x 1500 km grid in the Philippines Archipelago.
 
 The data comes in the form of 200 csv files, each of which contains a 504 x 555 grid of velocity data, and one mask file that differentiates land and water.
 
@@ -22,10 +22,7 @@ It's hard to get a sense of what we are actually looking at here with this data.
 The [Indian Ocean Dipole]( https://en.wikipedia.org/wiki/Indian_Ocean_Dipole) is a temperature anomaly in which the eastern and western regions of the Indian Ocean are extremely negatively correlated, which has far-reaching climate impacts that can be felt as far as South America through its impact on El Nino.
 
 
-![Indian Ocean Dipole](https://en.wikipedia.org/wiki/Indian_Ocean_Dipole#/media/File:Sstanom_199711_krig.jpg)
-Source - Wikipedia
-
-Nothing this impactful exists in the data we have, but it is a good exercise to see if we can come up with areas that are positively or negatively correlated. The algorithm I implemented uses random sampling instead of calculating a (504x555)<sup>2</sup> correlation coefficients and is explained in detail in the docstring of the function titled find_dipoles in OceanFlow.py
+Nothing this impactful exists in the data we have, but it is a good exercise to see if we can come up with some long-range correlations in this data. The algorithm uses random sampling instead of calculating a (504x555)<sup>2</sup> correlation coefficients and is explained in detail in the docstring of the function titled find_dipoles in OceanFlow.py
 
 ![Indian Ocean Dipole](OceanFlowImages/Dipoles.png)
 

@@ -97,8 +97,8 @@ def find_dipoles(u_3d, v_3d, mask, plot=False):
         corr1 = compute_correlations(point_vec_a, point_vec_b)
 
         cutoff = [abs(corr1) > .90,
-                  abs(col_index_1 - col_index_2) > 20,
-                  abs(row_index_1 - row_index_2) > 20]
+                  abs(col_index_1 - col_index_2) > 10,
+                  abs(row_index_1 - row_index_2) > 10]
 
         if np.all(cutoff):
             point_vec_c = v_3d[row_index_1, col_index_1, :]
@@ -110,7 +110,7 @@ def find_dipoles(u_3d, v_3d, mask, plot=False):
                 correlations_dict[key] = (corr1, corr2)
     if plot:
         fig, ax = plt.subplots()
-        ax.imshow(mask, alpha=1, cmap='ocean', aspect='auto')
+        ax.imshow(mask, alpha=.75, cmap='ocean', aspect='auto')
         for key, value in correlations_dict.items():
             x1, y1, x2, y2 = key
             corr_u, corr_v = value
@@ -119,6 +119,7 @@ def find_dipoles(u_3d, v_3d, mask, plot=False):
             marker = "+" if corr_u > 0 else "_"
             ax.scatter([x1, x2], [y1, y2], marker=marker, s=80)
         plt.savefig("OceanFlowImages/Dipoles.png", format='png', transparent=True)
+        plt.title("Positive and Negative Dipoles")
         plt.show()
 
     return correlations_dict
