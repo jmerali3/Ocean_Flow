@@ -1,6 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 from numpy.random import default_rng
 
 """Utility functions for loading, saving, and analyzing Ocean Flow data"""
@@ -66,26 +64,23 @@ def get_colors(length):
         rbg.append(tuple(rng.random(3, )))
     return rbg
 
+
 def get_log_likelihood(posterior, train_labels, K_train, K_test, K_cross, tau):
-    """
-    :param posterior:
-    :param train_labels:
-    :param K_train:
-    :param K_test:
-    :param K_cross:
-    :param tau:
-    :return:
+    """Determines the log probability of the posterior data given the train_label and covariance matrices (kernels)
+    :param posterior: Posterior prediction after
+    :param train_labels: Velocity at time t for known data points
+    :param K_train: Kernel covariance matrix for the training data
+    :param K_test: Kernel covariance matrix for the test data
+    :param K_cross: Cross co-variance data between training and test data
+    :param tau: Noise variance parameter
+    :return: the natural log of the likelihood of the posterior prediction.
     C. E. Rasmussen & C. K. I. Williams, Gaussian Processes for Machine Learning, the MIT Press, 2006 for more info
     """
     intermediate_term = K_cross.T @ np.linalg.inv(K_train + tau * np.eye(len(K_train)))  # 5x95 @ 95x95 = 5 x 95
-    mu = intermediate_term @ train_labels.reshape(-1,1)  # 5x95 @ 95x1 = 5x1
+    mu = intermediate_term @ train_labels.reshape(-1, 1)  # 5x95 @ 95x1 = 5x1
     cov = K_test - intermediate_term @ K_cross  # 5x5 - 5x95 @ 95x5 = 5x5
     log_like = -.5 * np.log(cov) - (posterior - mu)**2/(2*cov) - .5*np.log(2*np.pi)
     return log_like
-    # log_like = -.5 * posterior.T @ np.linalg.solve(K, posterior)\
-    #           - .5 * np.log(np.linalg.det(K))\
-    #           - 10 / 2 * np.log(2 * np.pi)
-    # return log_like
 
 
 def compute_kernel(vector_1, vector_2, l2, sig2):
@@ -98,9 +93,10 @@ def compute_kernel(vector_1, vector_2, l2, sig2):
     :return: The RBF or squared distance kernel as a covariance (vector 1 = vector 2)
     or cross-covariance (vector 1 != vector 2)
     """
-    squared_dist = np.sum(vector_1**2,1).reshape(-1,1) + np.sum(vector_2**2,1) - 2*np.dot(vector_1, vector_2.T)
-    K = sig2 * np.exp(-1/l2 * squared_dist)
-    return K
+    squared_dist = np.sum(vector_1**2, 1).reshape(-1, 1) + np.sum(vector_2**2, 1) - 2*np.dot(vector_1, vector_2.T)
+    kernel = sig2 * np.exp(-1/l2 * squared_dist)
+    return kernel
+
 
 def zip_dict(u_d, v_d):
     """Creates a new dictionary with the same keys as the input and the values combined into a tuple"""
@@ -108,4 +104,3 @@ def zip_dict(u_d, v_d):
     for key in ["l2", "sig2", "tau"]:
         zipped_dict[key] = u_d[key], v_d[key]
     return zipped_dict
-
