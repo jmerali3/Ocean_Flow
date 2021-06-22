@@ -91,11 +91,14 @@ def find_dipoles(u_3d, v_3d, mask, plot=False):
         if point_vec_a.all() == 0.0 or point_vec_b.all() == 0.0:
             continue
 
+        if mask[row_index_1, col_index_1] == False or mask[row_index_2, col_index_2] == False:
+            continue
+
         corr1 = compute_correlations(point_vec_a, point_vec_b)
 
         cutoff = [abs(corr1) > .90,
-                  abs(col_index_1 - col_index_2) > 10,
-                  abs(row_index_1 - row_index_2) > 10]
+                  abs(col_index_1 - col_index_2) > 20,
+                  abs(row_index_1 - row_index_2) > 20]
 
         if np.all(cutoff):
             point_vec_c = v_3d[row_index_1, col_index_1, :]
@@ -107,7 +110,7 @@ def find_dipoles(u_3d, v_3d, mask, plot=False):
                 correlations_dict[key] = (corr1, corr2)
     if plot:
         fig, ax = plt.subplots()
-        ax.imshow(mask, alpha=0.5, cmap='ocean', aspect='auto')
+        ax.imshow(mask, alpha=1, cmap='ocean', aspect='auto')
         for key, value in correlations_dict.items():
             x1, y1, x2, y2 = key
             corr_u, corr_v = value
@@ -115,7 +118,7 @@ def find_dipoles(u_3d, v_3d, mask, plot=False):
                   f"u-corr coefficient: {corr_u}; v-corr coefficient: {corr_v}")
             marker = "+" if corr_u > 0 else "_"
             ax.scatter([x1, x2], [y1, y2], marker=marker, s=80)
-        plt.savefig("Dipole.png", format='png', transparent=True)
+        plt.savefig("OceanFlowImages/Dipoles.png", format='png', transparent=True)
         plt.show()
 
     return correlations_dict
@@ -361,7 +364,7 @@ def main():
 
     # -------------------------------------------------------------------------------------------------------------#
 
-    ocean_streamplots(*uv_mask_data)
+    # ocean_streamplots(*uv_mask_data)
 
     # -------------------------------------------------------------------------------------------------------------#
 
