@@ -77,32 +77,45 @@ def get_colors(length):
         rbg.append(tuple(rng.random(3, )))
     return rbg
 
-def get_log_likelihood(posterior, K):
-    log_like = -.5 * posterior.T @ np.linalg.solve(K, posterior)\
-              - .5 * np.log(np.linalg.det(K))\
-              - 10 / 2 * np.log(2 * np.pi)
+def get_log_likelihood(posterior, train_labels, K_train, K_test, K_cross, tau):
+    """
+    :param posterior:
+    :param train_labels:
+    :param K_train:
+    :param K_test:
+    :param K_cross:
+    :param tau:
+    :return:
+    C. E. Rasmussen & C. K. I. Williams, Gaussian Processes for Machine Learning, the MIT Press, 2006 for more info
+    """
+    intermediate_term = K_cross.T @ np.linalg.inv(K_train + tau * np.eye(len(K_train)))  # 5x95 @ 95x95 = 5 x 95
+    mu = intermediate_term @ train_labels.reshape(-1,1)  # 5x95 @ 95x1 = 5x1
+    cov = K_test - intermediate_term @ K_cross  # 5x5 - 5x95 @ 95x5 = 5x5
+    log_like = -.5 * np.log(cov) - (posterior - mu)**2/(2*cov) - .5*np.log(2*np.pi)
     return log_like
+    # log_like = -.5 * posterior.T @ np.linalg.solve(K, posterior)\
+    #           - .5 * np.log(np.linalg.det(K))\
+    #           - 10 / 2 * np.log(2 * np.pi)
+    # return log_like
 
 
-def compute_kernel(dimension, l2, sig2):
+def compute_kernel(vector_1, vector_2, l2, sig2):
     """ This computes the kernel between the INDICES of train and test, not the labels.
      The idea is that closer indices (x-axis) leads to higher covariance
+    :param vector_1: Vector for either training or test data
+    :param vector_2: Vector for either training or test data
+    :param l2: length scale. The shorter the length scale, the faster the covariance decays with Euclidian distance
+    :param sig2: Scaling factor that impacts absolute variance. Will be the diagonal entries of the covariance matrix.
+    :return: The RBF or squared distance kernel as a covariance (vector 1 = vector 2)
+    or cross-covariance (vector 1 != vector 2)
     """
-    K = np.zeros(np.array(dimension))
-    for i in range(dimension[0]):
-        for j in range(dimension[1]):
-            K[i, j] = sig2 * np.exp((i-j) ** 2 / -l2)
+    squared_dist = np.sum(vector_1**2,1).reshape(-1,1) + np.sum(vector_2**2,1) - 2*np.dot(vector_1, vector_2.T)
+    K = sig2 * np.exp(-1/l2 * squared_dist)
     return K
 
+def zip_dict(u_d, v_d):
+    zipped_dict = {}
+    for key in ["l2", "sig2", "tau"]:
+        zipped_dict[key] = u_d[key], v_d[key]
+    return zipped_dict
 
-def compute_data_kernel(array, l2, sig2, tau):
-    """ This computes the kernel between the INDICES of train and test, not the labels.
-     The idea is that closer indices (x-axis) leads to higher covariance
-    """
-    # array_noise =
-    dim = len(array)
-    K = np.zeros([dim, dim])
-    for i in range(dim):
-        for j in range(dim):
-            K[i, j] = sig2 * np.exp((array[i]-array[j]) ** 2 / -l2)
-    return K

@@ -1,12 +1,14 @@
+from operator import itemgetter
+
 import pandas as pd
 import numpy as np
 from numpy.random import default_rng
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from matplotlib import cm
+import matplotlib as mpl
 import seaborn as sns
 from sklearn.model_selection import KFold
-from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import RBF
 from PIL import Image
 import OceanFlow_utils
 
@@ -51,118 +53,113 @@ def interpolate(arr, n, l2, sig2, tau, plot=False):
 # f_post, mu, stdv = interpolate(u, 300, l2, sig2, tau)
 
 
-def compute_movement_extended(x_current, y_current, n):
-    # computes new movements and locations for each time step, given x and y initial coordinates
-    x, y, u, v = [np.zeros(n) for _ in range(4)]
-    for i in range(n):
-        x[i] = min(x_current, 554)
-        y[i] = min(y_current, 503)
-        int_x = int(round(x[i], 0))
-        int_y = int(round(y[i], 0))
-        f_post_u, mu_u, stdv_u = interpolate(u_array[int_x, int_y, :], n, l2, sig2, tau)
-        f_post_v, mu_v, stdv_v = interpolate(v_array[int_x, int_y, :], n, l2, sig2, tau)
-        u[i] = f_post_u[i]
-        v[i] = f_post_v[i]
-        x_current = x_current + u[i] * 24  # km = km + km/hr * 24 hr/day. Each time step is 1 day in f_post
-        y_current = y_current + v[i] * 24
+# def compute_movement_extended(x_current, y_current, n):
+#     # computes new movements and locations for each time step, given x and y initial coordinates
+#     x, y, u, v = [np.zeros(n) for _ in range(4)]
+#     for i in range(n):
+#         x[i] = min(x_current, 554)
+#         y[i] = min(y_current, 503)
+#         int_x = int(round(x[i], 0))
+#         int_y = int(round(y[i], 0))
+#         f_post_u, mu_u, stdv_u = interpolate(u_array[int_x, int_y, :], n, l2, sig2, tau)
+#         f_post_v, mu_v, stdv_v = interpolate(v_array[int_x, int_y, :], n, l2, sig2, tau)
+#         u[i] = f_post_u[i]
+#         v[i] = f_post_v[i]
+#         x_current = x_current + u[i] * 24  # km = km + km/hr * 24 hr/day. Each time step is 1 day in f_post
+#         y_current = y_current + v[i] * 24
+#
+#     # movement_summary = pd.DataFrame({'x': x, 'y': y, 'u': u, 'v': v}) # row is timestep, columns are x coord, y coord, x magnitude, y magnitude
+#     movement_summary = np.stack((x, y, u, v), axis=1)
+#     return movement_summary
 
-    # movement_summary = pd.DataFrame({'x': x, 'y': y, 'u': u, 'v': v}) # row is timestep, columns are x coord, y coord, x magnitude, y magnitude
-    movement_summary = np.stack((x, y, u, v), axis=1)
-    return movement_summary
 
-
-def Kfold_function(data, hyperparameters, plot=False):
-    loss = []
-    l_sq = hyperparameters["l2"]
-    sig_sq = hyperparameters["sig2"]
-    tau = hyperparameters["tau"]
-    GKF = KFold(n_splits=25)
-    for train, test in GKF.split(data):
-        train_labels = data[train]
-        test_labels = data[test]
+def Kfold_function(direction_vec, l2=None, sig2=None, tau=None, hyperparameters=None, plot=False):
+    likelihood = []
+    if hyperparameters is not None:
+        l2 = hyperparameters["l2"]
+        sig2 = hyperparameters["sig2"]
+        tau = hyperparameters["tau"]
+    GKF = KFold(n_splits=20)
+    for train, test in GKF.split(direction_vec):
+        train_labels = direction_vec[train]
+        train = train.reshape(-1, 1)
+        test = test.reshape(-1, 1)
         train_len, test_len = len(train), len(test)
-        K_train = OceanFlow_utils.compute_kernel([train_len, train_len], l_sq, sig_sq)
-        K_test = OceanFlow_utils.compute_kernel([test_len, test_len], l_sq, sig_sq)
-        K_cross = OceanFlow_utils.compute_kernel([train_len, test_len], l_sq, sig_sq)
-        K_truth = OceanFlow_utils.compute_data_kernel(test_labels, l_sq, sig_sq, tau)
+        K_train = OceanFlow_utils.compute_kernel(train, train, l2, sig2)
+        K_test = OceanFlow_utils.compute_kernel(test, test, l2, sig2)
+        K_cross = OceanFlow_utils.compute_kernel(train, test, l2, sig2)
         L = np.linalg.cholesky(K_train + tau * np.eye(train_len))
         Lk = np.linalg.solve(L, K_cross)
         mu = np.dot(Lk.T, np.linalg.solve(L, train_labels))
         stdv = np.sqrt(np.diag(K_test) - np.sum(Lk ** 2, axis=0))
         L_final = np.linalg.cholesky(K_test + tau * np.eye(test_len) - np.dot(Lk.T, Lk))
-        f_post = mu.reshape(-1, 1) + L_final @ np.random.normal(size=(test_len,1))
-        log_like = OceanFlow_utils.get_log_likelihood(f_post, K_truth)
-        loss.append(log_like)
+        f_post = mu.reshape(-1, 1) + L_final @ np.random.normal(size=(test_len, 1))
+        log_like = OceanFlow_utils.get_log_likelihood(f_post, train_labels, K_train, K_test, K_cross, tau)
+        likelihood.append(log_like)
         if plot:
-            plt.plot(train, train_labels, lw=3)
+            plt.plot(np.arange(len(direction_vec)), direction_vec, lw=3)
             plt.plot(test, f_post)
             plt.gca().fill_between(test.flat, mu - 3 * stdv, mu + 3 * stdv, color="#dddddd")
             plt.plot(test, mu, 'r--', lw=2)
             plt.show()
 
-    return loss, round(np.array(loss).mean(), 2)  # , fpost_list, stdv_list, mu_list, test_list
+    return round(np.array(likelihood).mean(), 2)
 
 
-# sig_sq = .001
-# l_sq = 15
-# _, _, fpost, stdv, mu, test = Kfold_function_2(u, l_sq= l_sq, sig_sq=sig_sq, tau=.001, plot=False)
-#
-# fig, ax = plt.subplots()
-# ax.set_xlim([0, 100])
-# ax.set_ylim([-.5, 1])
-# ax.scatter([], [])
-#
-# def animate_K(i):
-#     f = fpost[i]
-#     s = stdv[i]
-#     m = mu[i]
-#     t = test[i]
-#     ax.set_title(f"Dir = U, Fold = {i}, sig^2 = {sig_sq}, l^2 = {l_sq}")
-#     ax.plot(t, f)
-#     fig.gca().fill_between(t.flat, m - 3 * s, m + 3 * s, color="#dddddd")
-#     ax.plot(t, m, 'r--', lw=2)
-#     ax.plot(np.arange(0,len(u)),u, c='b')
-#     return ax
-#
-#
-# ani = animation.FuncAnimation(fig, animate_K, frames=len(fpost), interval=250, repeat=False)
-# ani.save("KFold-U.gif", writer=animation.PillowWriter(fps=10))
-# plt.show()
 
+def hyperparameter_optimization(direction_vector, direction, hyperparameters):
+    tau = hyperparameters["tau"]
+    l2 = hyperparameters["l2"]
+    sig2 = hyperparameters["sig2"]
 
-def parameter_optimization(direction):
-    tau = .0001
-    l_sq = [1, 5, 10, 15, 50]
-    sig_sq = [.01, .1, 1, 10, 100]
-    params = np.zeros([len(l_sq), len(sig_sq)])
+    Kfold_vectorized = np.vectorize(Kfold_function, excluded={0, "plot", "hyperparameters"})
 
-    if direction.lower() == 'u':
-        direction_is_U = True
-    elif direction.lower() == 'v':
-        direction_is_U = False
-    else:
-        return None
-    arr = u if direction_is_U else v
-    for l_ind, l in enumerate(l_sq):
-        for s_ind, s in enumerate(sig_sq):
-            loss, loss_avg = Kfold_function(arr, l, s, tau)
-            params[l_ind, s_ind] = loss_avg
+    l2_mesh, sig2_mesh = np.meshgrid(l2, sig2)
+    log_like = Kfold_vectorized(direction_vector, l2=l2_mesh, sig2=sig2_mesh, tau=tau)
 
-    df = pd.DataFrame(params, columns=sig_sq, index=l_sq)
-    sns.heatmap(df, vmax=0, vmin=-20, annot=True)
-    plt.ylabel('l^2')
-    plt.xlabel('sig^2')
-    title = "U Direction" if direction_is_U else "V Direction"
-    plt.title(title)
+    log_like_dict = {}
+    for l_iter, s_iter, log_iter in zip(l2_mesh.flatten(), sig2_mesh.flatten(), log_like.flatten()):
+        log_like_dict[(l_iter, s_iter)] = log_iter
+
+    max_likelihood = {"max_likelihood": np.max(log_like)}
+    max_log_index = np.where(log_like == max_likelihood["max_likelihood"])
+    max_likelihood["l2"] = np.round(l2_mesh[max_log_index[0], max_log_index[1]],1)
+    max_likelihood["sig2"] = np.round(sig2_mesh[max_log_index[0], max_log_index[1]],1)
+    max_likelihood["tau"] = tau
+
+    fig, ax = plt.subplots()
+    sns.heatmap(log_like, ax=ax)
+    ax.set_xticklabels(list(l2))
+    ax.set_yticklabels(list(sig2))
+    ax.set_xticks(np.arange(len(l2)))
+    ax.set_yticks(np.arange(len(sig2)))
+    ax.set_xlabel("l2")
+    ax.set_ylabel("sig2")
+    ax.set_title(f"{direction} Optimum: l2 - {max_likelihood['l2']} sig2 - {max_likelihood['sig2']}")
+    plt.savefig(f"OceanFlowImages/{direction.upper()}_Parameter_Optimization_Heatmap.png", format="png")
     plt.show()
+
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    ax.plot_surface(l2_mesh, sig2_mesh, log_like, cmap=cm.coolwarm)
+    ax.set_title(f"{direction} Optimum: l2 - {max_likelihood['l2']} sig2 - {max_likelihood['sig2']}")
+    ax.set_xlabel("l2")
+    ax.set_ylabel("sig2")
+    ax.set_zlabel("Log Likelihood")
+    norm = mpl.colors.Normalize(vmin=np.min(log_like), vmax=max_likelihood["max_likelihood"])
+    fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.coolwarm), ax=ax)
+    plt.savefig(f"OceanFlowImages/{direction.upper()}_Parameter_Optimization.png", format="png")
+    plt.show()
+    return log_like_dict, max_likelihood
 
 
 def kernel_heatmap(dim, l2, sig2):
     """Enter l2 and s2 as nxn tuples"""
+    dummy_vector = np.arange(dim).reshape(-1, 1)
     fig, axes = plt.subplots(nrows=len(sig2), ncols=len(l2))
     for l2_outer, s2_outer, ax_outer in zip(l2, sig2, axes):
         for l2_inner, s2_inner, ax_inner in zip(l2_outer, s2_outer, ax_outer):
-            kernel = OceanFlow_utils.compute_kernel([dim, dim], l2_inner, s2_inner)
+            kernel = OceanFlow_utils.compute_kernel(dummy_vector, dummy_vector, l2_inner, s2_inner)
             ax_inner.set_title(f"l2 = {l2_inner}, sig2 = {s2_inner}")
             sns.heatmap(kernel, ax=ax_inner, square=True, cmap="Blues", vmax=sig2.max())
     plt.suptitle(f"N = {dim} Kernel Covariance Matrix")
@@ -171,26 +168,55 @@ def kernel_heatmap(dim, l2, sig2):
     plt.show()
 
 
-
-def plot_crash_coordinates_gauss(u_3d, v_3d, plane_crash_coordinates, hyperparameters):
+def plot_crash_coordinates_gauss_prior(u_3d, v_3d, plane_crash_coordinates, hyperparameters):
     """Will only use the first two parameters of l2 and sig2"""
     l2 = hyperparameters["l2"][0:2]
     sig2 = hyperparameters["sig2"][0:2]
     fig, axes = plt.subplots(nrows=1, ncols=2, sharex=True, sharey=True)
     x, y = plane_crash_coordinates
-    for array, dir, color, ax, l, s in zip([u_3d, v_3d], ["U", "V"], ['b', 'r'], axes, l2, sig2):
+    for array, dir, color, ax, param_l, param_s in zip([u_3d, v_3d], ["U", "V"], ['b', 'r'], axes, l2, sig2):
         velocity = array[x, y, :]
         t = len(velocity)
-        time = np.arange(t)
-        n = len(velocity)
-        K_ss = compute_kernel([t, t], l, s)
-        L = np.linalg.cholesky(K_ss + 1e-15 * np.eye(n))
-        f_prior = np.dot(L, rng.normal(size=(n, 3)))
+        time = np.arange(t).reshape(-1, 1)
+        K_ss = OceanFlow_utils.compute_kernel(time, time, param_l, param_s)
+        L = np.linalg.cholesky(K_ss + 1e-15 * np.eye(t))
+        f_prior = np.dot(L, rng.normal(size=(t, 3)))
         ax.plot(time, velocity, c=color, linewidth=1.5)
         ax.plot(time, f_prior, linewidth=.75)
-        ax.set_title(f"{dir} Direction; l2 = {l}, sig2 = {s}")
+        ax.set_title(f"{dir} Direction; l2 = {param_l}, sig2 = {param_s}")
     plt.suptitle(f"Gaussian Prior for [{x}, {y}]")
     plt.savefig(f"OceanFlowImages/gaussian_prior.png", format="png")
+    plt.show()
+
+
+def plot_crash_coordinates_gauss_posterior(u_3d, v_3d, plane_crash_coordinates, hyperparameters):
+    """Will only use the first two parameters of l2 and sig2"""
+    l2 = hyperparameters["l2"][0:2]
+    sig2 = hyperparameters["sig2"][0:2]
+    fig, axes = plt.subplots(nrows=1, ncols=2, sharex=True, sharey=True)
+    x, y = plane_crash_coordinates
+    n = 1000
+    for array, dir, color, ax, l_param, s_param in zip([u_3d, v_3d], ["U", "V"], ['b', 'r'], axes, l2, sig2):
+        Ytrain = array[x, y, :]  # aka velocity
+        t = len(Ytrain)
+        Xtrain = np.arange(t).reshape(-1, 1)  # aka time
+        Xtest = np.linspace(0, t, n).reshape(-1, 1)
+        K = OceanFlow_utils.compute_kernel(Xtrain, Xtrain, l_param, s_param)
+        K_ss = OceanFlow_utils.compute_kernel(Xtest, Xtest, l_param, s_param)
+        K_s = OceanFlow_utils.compute_kernel(Xtrain, Xtest, l_param, s_param)
+        L = np.linalg.cholesky(K + .00005 * np.eye(t))  # 100 x 100
+        Lk = np.linalg.solve(L, K_s)  # 100 x 1000
+        mu = np.dot(Lk.T, np.linalg.solve(L, Ytrain)).reshape((n,))  # 1000
+        s2 = np.diag(K_ss) - np.sum(Lk ** 2, axis=0)
+        stdv = np.sqrt(s2)
+        L = np.linalg.cholesky(K_ss + 1e-6 * np.eye(n) - np.dot(Lk.T, Lk))  # 1000 x 1000
+        f_post = mu.reshape(-1, 1) + np.dot(L, np.random.normal(size=(n, 3)))  # 1000 x 3
+        ax.plot(Xtrain, Ytrain, c=color, linewidth=1.5)
+        ax.plot(Xtest, f_post, linewidth=.75)
+        ax.set_title(f"{dir} Direction; l2 = {l_param}, sig2 = {s_param}")
+        ax.fill_between(Xtest.flat, mu - 2 * stdv, mu + 2 * stdv, color="#dddddd")
+    plt.suptitle(f"Gaussian Posterior for [{x}, {y}]")
+    plt.savefig(f"OceanFlowImages/gaussian_post.png", format="png")
     plt.show()
 
 
@@ -335,6 +361,7 @@ def main():
     """ [Insert description]
         1. Tries to load numpy arrays from saved files. If not found, calls load_save_data from OceanFlow_utils
         2. Calls the ocean_streamplot function to create and save a streamplot of the flow data"""
+    # TODO Docstring everything with triple quotes then enter
     try:
         uv_mask_data = np.load("u_3d.npy"), np.load("v_3d.npy"), np.load("mask.npy").astype('bool')
     except FileNotFoundError:
@@ -391,18 +418,22 @@ def main():
     # Th next step will be to optimize the model by finding the best hyperparamters.
     # Note, that in this example, all the data points are equally spaced, but that need not be true.
 
-    # First, let's get a sense of what the prior distribution look slike with arbitrary l2 and s2
-
+    # First, let's get a sense of what the prior distribution looks like with arbitrary l2 and s2. This is the model
+    # before any data has been incorporated
     l2, sig2 = (10, 1), (1, .1)
     hyperparameters_gaussian_plot = {"l2": l2, "sig2": sig2}
-    # plot_crash_coordinates_gauss(u_3d, v_3d, plane_crash_coordinates, hyperparameters_gaussian_plot)
+    # plot_crash_coordinates_gauss_prior(u_3d, v_3d, plane_crash_coordinates, hyperparameters_gaussian_plot)
 
     # It's clear that a higher length scale smooth smooths out the curves and a lower sigma makes the distribution
     # tighter. This model assumed the mean = 0, which is clearly not the case. We can incorporate our measurement data
-    # and find a posterior Gaussian model.
+    # and find a posterior Gaussian model. While the first plot looks like it fits the data well, it is actually a poor
+    # model, as it overfits the data.
+
+    # Let's take a look at what the posterior function looks like with the same hyperparameters. In other words,
+    # after we see some data, how has the model improved?
+    plot_crash_coordinates_gauss_posterior(u_3d, v_3d, plane_crash_coordinates, hyperparameters_gaussian_plot)
 
     # -------------------------------------------------------------------------------------------------------------#
-
 
     # Isolate the data to only look at a 2D array at the specified crash point instead of the entire set
     crash_u = u_3d[plane_crash_coordinates[0], plane_crash_coordinates[1], :]
@@ -412,9 +443,7 @@ def main():
     # The kernel function will input an Nx1 matrix and return a symmetric NxN matrix with all diagonals = 1
     # and each i,j entry is the covariance between points i,j
 
-
-
-    #Let's visualize this
+    # Let's visualize this
     # heatmap_l2 = np.array(((10, 5, 1), (10, 5, 1), (10, 5, 1)))
     # heatmap_sig2 = np.array(((10, 10, 10), (8, 8, 8), (5, 5, 5)))
     # kernel_heatmap(10, heatmap_l2, heatmap_sig2)
@@ -425,16 +454,45 @@ def main():
 
     # -------------------------------------------------------------------------------------------------------------#
 
-    # So what are the hyperparameters that will yield the best model? For that, we need to define a loss function -
-    # or a measure of how far off the predictions are from ground truth. We will use the log-likelihood as the
-    # measurement of how good the fit is by using K-Fold cross-validation. The idea here is to artificially remove
-    # some of the data from our ground truth training data, make the prediction with a given set of hyperparameters,
-    # and compare the goodness of fit by using log-likelihood estimation - or what is the probability of seeing our
-    # prediction given the ground truth data. We repeat this process for all sets of hyperparameters and for 25 K-folds
-    # of the data.
-    K_fold_hyperparamters = {"l2": 1, "sig2":.001, "tau":.0001}
-    loss, loss_list = Kfold_function(crash_u, K_fold_hyperparamters, plot=True)
-    print(loss)
-    print(loss_list)
+    # So what are the hyperparameters that will yield the best model? For that, we need to define a metric by which
+    # to gauge our predictions - a measure of how far off the predictions are from ground truth. We will use the
+    # log-likelihood as the measurement of how good the fit is by using K-Fold cross-validation. The idea here is to
+    # artificially remove some of the data from our ground truth training data, make the prediction with a given set
+    # of hyperparameters, and compare the goodness of fit by using log-likelihood estimation - or what is the
+    # probability of seeing our prediction given the training data, training covariance, and cross-covariance. We
+    # repeat this process for all sets of hyperparameters and for 25 K-folds of the data.
+    # [Insert explanation about log likelihood]
+
+    # K_fold_hyperparameters = {"l2": 10, "sig2":.05, "tau":1e-5}
+    # loss_list, avg_loss = Kfold_function(crash_u, K_fold_hyperparameters, plot=False)
+
+    # l2_opt = np.arange(50, 200, 10)
+    # sig2_opt = np.arange(30, 180, 10)
+    # tau_opt = 1e-5
+    # opt_hyperparameters = {"l2": l2_opt, "sig2": sig2_opt, "tau": tau_opt}
+    # log_like_dict_u, max_likelihood_u_params = hyperparameter_optimization(crash_u, "U", opt_hyperparameters)
+    # log_like_dict_v, max_likelihood_v_params = hyperparameter_optimization(crash_v, "V", opt_hyperparameters)
+    #
+    # print("U Direction Optimal Parameters")
+    # for key, value in max_likelihood_u_params.items():
+    #     print(f"{key}: {value}")
+    #
+    # print("V Direction Optimal Parameters")
+    # for key, value in max_likelihood_v_params.items():
+    #     print(f"{key}: {value}")
+    #
+    # # Our optimization algorithm has returned an optimal (l2, sig2) of (190, 60) for the U Direction and (190, 50).
+    # # Marginal improvements could be made by increasing the granularity of our grid search, but at this point, I feel
+    # # like these parameters are good enough for us to begin our model fit.
+    # # -------------------------------------------------------------------------------------------------------------#
+    # # Let's plot the Gaussian posteriors with these new parameters
+    # max_likelihood_params = OceanFlow_utils.zip_dict(max_likelihood_u_params, max_likelihood_v_params)
+    # plot_crash_coordinates_gauss_posterior(u_3d, v_3d, plane_crash_coordinates, max_likelihood_params)
+
+    # -------------------------------------------------------------------------------------------------------------#
+
+
+
+
 if __name__ == "__main__":
     main()
