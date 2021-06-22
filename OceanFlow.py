@@ -85,8 +85,6 @@ def find_dipoles(u_3d, v_3d, mask, plot=False):
         row_index_2 = rng.integers(low=0, high=rows)
         point_vec_a = u_3d[row_index_1, col_index_1, :]
         point_vec_b = u_3d[row_index_2, col_index_2, :]
-        # The reason this is y then x is the array is indexed by rows, columns
-        # and the y direction specifies the # of rows and x direction the # of columns
 
         if point_vec_a.all() == 0.0 or point_vec_b.all() == 0.0:
             continue
@@ -187,7 +185,7 @@ def plot_crash_coordinates_gauss_prior(u_3d, v_3d, plane_crash_coordinates, hype
     plt.show()
 
 
-def plot_crash_coordinates_gauss_posterior(u_3d, v_3d, plane_crash_coordinates, hyperparameters):
+def plot_crash_coordinates_gauss_posterior(u_3d, v_3d, plane_crash_coordinates, hyperparameters, filename):
     """Will only use the first two parameters of l2 and sig2"""
     l2 = hyperparameters["l2"][0:2]
     sig2 = hyperparameters["sig2"][0:2]
@@ -214,7 +212,7 @@ def plot_crash_coordinates_gauss_posterior(u_3d, v_3d, plane_crash_coordinates, 
         ax.set_title(f"{dir} Direction; l2 = {l_param}, sig2 = {s_param}")
         ax.fill_between(Xtest.flat, mu - 2 * stdv, mu + 2 * stdv, color="#dddddd")
     plt.suptitle(f"Gaussian Posterior for [{x}, {y}]")
-    plt.savefig(f"OceanFlowImages/gaussian_post.png", format="png")
+    plt.savefig(f"OceanFlowImages/{filename}.png", format="png")
     plt.show()
 
 
@@ -339,10 +337,18 @@ def hyperparameter_optimization(direction_vector, direction, hyperparameters):
 
 
 def main():
-    """ [Insert description]
+    """ Steps in analyzing ocean flow data
         1. Tries to load numpy arrays from saved files. If not found, calls load_save_data from OceanFlow_utils
-        2. Calls the ocean_streamplot function to create and save a streamplot of the flow data"""
-    # TODO Docstring everything with triple quotes then enter
+        2. Calls the ocean_streamplot function to create and save a streamplot of the flow data
+        3. Finds points of high correlation or anti-correlation with find_dipoles function
+        4. Given a location of a 'plane crash', animates the simulation of potential flows of debris with plane_crash(*)
+        5. Plots a Gaussian prior model over the time-series data at a specific point
+        6. Plots the Gaussian posterior over the same data with un-optimized hyperparameters
+        7. Plots heatmap visualizations of what kernel covariance matrices look like with different hyperparameters
+        8. Calculates the average log likelihood of KFold cross validation for one set of hyperparameters
+        9. Optimizes the hyperparameters for both directions to give the highest log likelihood and prints the results
+        10. Plots the Gaussian posterior with optimized hyperparameters
+        """
     try:
         uv_mask_data = np.load("u_3d.npy"), np.load("v_3d.npy"), np.load("mask.npy").astype('bool')
     except FileNotFoundError:
@@ -350,24 +356,22 @@ def main():
         uv_mask_data = np.load("u_3d.npy"), np.load("v_3d.npy"), np.load("mask.npy").astype('bool')
 
     u_3d, v_3d, mask = uv_mask_data
-    rows, columns, time = np.shape(u_3d)
 
     # -------------------------------------------------------------------------------------------------------------#
 
-    # TODO Commenting this out for now because it takes a long time to run. Uncomment for final version ###
     ocean_streamplots(*uv_mask_data)
 
     # -------------------------------------------------------------------------------------------------------------#
-    # TODO Commenting this out for now because it takes a long time to run. Uncomment for final version ###
-    # correlations = find_dipoles(*uv_mask_data, plot=True)
+
+    correlations = find_dipoles(*uv_mask_data, plot=True)
 
     # -------------------------------------------------------------------------------------------------------------#
 
     # Say you have this data and a plane crashed at 400, 400. Where do you look for parts? Let's create as simulation
     # that shows where the flow possibly took the parts as a function of the timestep and assumed variance
-    # TODO Commenting this out for now because it takes a long time to run. Uncomment for final version ###
+
     plane_crash_coordinates = [400, 400]
-    # plane_crash(*uv_mask_data, plane_crash_coordinates)
+    plane_crash(*uv_mask_data, plane_crash_coordinates)
 
     # -------------------------------------------------------------------------------------------------------------#
     # The time steps are quite far apart, so you want to interpolate between seemingly random signals. How do you do
@@ -393,9 +397,9 @@ def main():
 
     # First, let's get a sense of what the prior distribution looks like with arbitrary l2 and s2. This is the model
     # before any data has been incorporated
-    # l2, sig2 = (10, 1), (1, .1)
-    # hyperparameters_gaussian_plot = {"l2": l2, "sig2": sig2}
-    # plot_crash_coordinates_gauss_prior(u_3d, v_3d, plane_crash_coordinates, hyperparameters_gaussian_plot)
+    l2, sig2 = (10, 1), (1, .1)
+    hyperparameters_gaussian_plot = {"l2": l2, "sig2": sig2}
+    plot_crash_coordinates_gauss_prior(u_3d, v_3d, plane_crash_coordinates, hyperparameters_gaussian_plot)
 
     # It's clear that a higher length scale smooth smooths out the curves and a lower sigma makes the distribution
     # tighter. This model assumed the mean = 0, which is clearly not the case. We can incorporate our measurement data
@@ -404,7 +408,8 @@ def main():
 
     # Let's take a look at what the posterior function looks like with the same hyperparameters. In other words,
     # after we see some data, how has the model improved?
-    # plot_crash_coordinates_gauss_posterior(u_3d, v_3d, plane_crash_coordinates, hyperparameters_gaussian_plot)
+    plot_crash_coordinates_gauss_posterior(u_3d, v_3d, plane_crash_coordinates, hyperparameters_gaussian_plot,
+                                           "gaussian_post")
 
     # -------------------------------------------------------------------------------------------------------------#
 
@@ -417,10 +422,10 @@ def main():
     # and each i,j entry is the covariance between points i,j
 
     # Let's visualize this
-    # TODO Uncomment this
-    # heatmap_l2 = np.array([50, 30, 10])
-    # heatmap_sig2 = np.array([30, 20, 10])
-    # kernel_heatmap(10, heatmap_l2, heatmap_sig2)
+
+    heatmap_l2 = np.array([50, 30, 10])
+    heatmap_sig2 = np.array([30, 20, 10])
+    kernel_heatmap(10, heatmap_l2, heatmap_sig2)
 
     # We can see that the length scale defines how quickly the covariance decays as the distance between points gets
     # further away. We can also see that sigma^2 defines the magnitude of the covariance. The diagonals will be
@@ -437,36 +442,35 @@ def main():
     # repeat this process for all sets of hyperparameters and for 25 K-folds of the data.
     # [Insert explanation about log likelihood]
 
-    # TODO Uncomment this
-    # K_fold_hyperparameters = {"l2": 10, "sig2":.05, "tau":1e-5}
-    # loss_list, avg_loss = Kfold_function(crash_u, K_fold_hyperparameters, plot=False)
+    Kfold_hyperparameters = {"l2": 10, "sig2": .05, "tau": 1e-5}
+    Kfold_LL = Kfold_function(crash_u, Kfold_hyperparameters, plot=False)
+    print(f"KFold Example - The average log likelihood for l2 = {Kfold_hyperparameters['l2']} and "
+          f"sig2 = {Kfold_hyperparameters['l2']} is {Kfold_LL}")
 
-    # l2_opt = np.arange(50, 200, 10)
-    # sig2_opt = np.arange(30, 180, 10)
-    # tau_opt = 1e-5
-    # opt_hyperparameters = {"l2": l2_opt, "sig2": sig2_opt, "tau": tau_opt}
-    # log_like_dict_u, max_likelihood_u_params = hyperparameter_optimization(crash_u, "U", opt_hyperparameters)
-    # log_like_dict_v, max_likelihood_v_params = hyperparameter_optimization(crash_v, "V", opt_hyperparameters)
-    #
-    # print("U Direction Optimal Parameters")
-    # for key, value in max_likelihood_u_params.items():
-    #     print(f"{key}: {value}")
-    #
-    # print("V Direction Optimal Parameters")
-    # for key, value in max_likelihood_v_params.items():
-    #     print(f"{key}: {value}")
-    #
-    # # Our optimization algorithm has returned an optimal (l2, sig2) of (190, 60) for the U Direction and (190, 50).
-    # # Marginal improvements could be made by increasing the granularity of our grid search, but at this point, I feel
-    # # like these parameters are good enough for us to begin our model fit.
-    # # -------------------------------------------------------------------------------------------------------------#
-    # # Let's plot the Gaussian posteriors with these new parameters
-    # max_likelihood_params = OceanFlow_utils.zip_dict(max_likelihood_u_params, max_likelihood_v_params)
-    # plot_crash_coordinates_gauss_posterior(u_3d, v_3d, plane_crash_coordinates, max_likelihood_params)
+    l2_opt = np.arange(50, 200, 10)
+    sig2_opt = np.arange(30, 180, 10)
+    tau_opt = 1e-5
+    opt_hyperparameters = {"l2": l2_opt, "sig2": sig2_opt, "tau": tau_opt}
+    log_like_dict_u, max_likelihood_u_params = hyperparameter_optimization(crash_u, "U", opt_hyperparameters)
+    log_like_dict_v, max_likelihood_v_params = hyperparameter_optimization(crash_v, "V", opt_hyperparameters)
 
+    print("U Direction Optimal Parameters")
+    for key, value in max_likelihood_u_params.items():
+        print(f"{key}: {value}")
+
+    print("V Direction Optimal Parameters")
+    for key, value in max_likelihood_v_params.items():
+        print(f"{key}: {value}")
+
+    # Our optimization algorithm has returned an optimal (l2, sig2) of (190, 60) for the U Direction and (190, 50).
+    # Marginal improvements could be made by increasing the granularity of our grid search, but at this point, I feel
+    # like these parameters are good enough for us to begin our model fit.
     # -------------------------------------------------------------------------------------------------------------#
+    # Let's plot the Gaussian posteriors with these new parameters
 
-
+    max_likelihood_params = OceanFlow_utils.zip_dict(max_likelihood_u_params, max_likelihood_v_params)
+    plot_crash_coordinates_gauss_posterior(u_3d, v_3d, plane_crash_coordinates, max_likelihood_params,
+                                           "gaussian_post_optimized")
 
 
 if __name__ == "__main__":

@@ -1,10 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 import seaborn as sns
 from numpy.random import default_rng
 
-# Utility functions for loading, saving, and analyzing Ocean Flow data
+"""Utility functions for loading, saving, and analyzing Ocean Flow data"""
 
 rng = default_rng(12345)
 
@@ -30,20 +29,8 @@ def load_save_data():
     np.save("mask", mask, allow_pickle=True)
 
 
-def create_mask_image(mask, filename):
-    """Creates a seaborn heatmap and saves it. This is intended to be an 'implot' background for other plots
-        Filename must be in png format
-    """
-    filename = filename if filename[-4:] == ".png" else filename + ".png"
-    sns.heatmap(~mask, cbar=False, cmap='Greens')
-    plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    plt.axis('tight')
-    plt.axis('off')
-    plt.savefig(filename, format='png', transparent=True)
-    plt.show()
-
-
 def calc_velocity(u, v):
+    """Creates an array of combined velocities given arrays of u and v direction velocity"""
     return np.sqrt(np.square(u) + np.square(v))
 
 
@@ -63,6 +50,7 @@ def compute_movement(x_current, y_current, u_3d, v_3d, time):
 
 
 def get_coordinates_toy(length, mu_x, mu_y, var_xy):
+    """Generates random points from the normal distribution at mu_* and var_xy"""
     x = rng.normal(mu_x, var_xy, length - 1)
     x = np.append(x, mu_x)
     y = rng.normal(mu_y, var_xy, length - 1)
@@ -72,6 +60,7 @@ def get_coordinates_toy(length, mu_x, mu_y, var_xy):
 
 
 def get_colors(length):
+    """Returns s a list (length=length) of randomly created tuples to be used as the color argument in matplotlib"""
     rbg = []
     for i in range(length):
         rbg.append(tuple(rng.random(3, )))
@@ -114,6 +103,7 @@ def compute_kernel(vector_1, vector_2, l2, sig2):
     return K
 
 def zip_dict(u_d, v_d):
+    """Creates a new dictionary with the same keys as the input and the values combined into a tuple"""
     zipped_dict = {}
     for key in ["l2", "sig2", "tau"]:
         zipped_dict[key] = u_d[key], v_d[key]
