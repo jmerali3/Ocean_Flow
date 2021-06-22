@@ -11,6 +11,7 @@ import OceanFlow_utils
 rng = default_rng(12345)
 plt.style.use("seaborn-whitegrid")
 
+
 def ocean_streamplots(u_3d, v_3d, mask):
     """Plots & animates the velocity-weighted flow using Matplotlib Streamplots with a mask background
     There is still a bug in the code that makes the gif resize at certain time points
@@ -22,6 +23,7 @@ def ocean_streamplots(u_3d, v_3d, mask):
     x, y, time = np.shape(u_3d)
 
     fig, ax = plt.subplots()
+
     def stream_animate(t):
         """Returns streamplot at time = t to be used by FuncAnimation"""
         plt.cla()
@@ -154,12 +156,12 @@ def plane_crash(u_3d, v_3d, mask, plane_crash_coordinates, variance=10, num_poin
     ax.scatter([], [])
     ax.imshow(mask, alpha=0.5, cmap='ocean', aspect='auto')
 
-    def animate2(i):
-        ax.set_title(f"T = {i + 1}, mu_x = {mu_x}, mu_y = {mu_y}, var_xy = {variance}")
-        ax.scatter(tx[i, :], ty[i, :], c=colors, s=2)
+    def animate(t):
+        ax.set_title(f"T = {t + 1}, mu_x = {mu_x}, mu_y = {mu_y}, var_xy = {variance}")
+        ax.scatter(tx[t, :], ty[t, :], c=colors, s=2)
         return ax
 
-    ani = animation.FuncAnimation(fig, animate2, frames=time, interval=50, repeat=False)
+    ani = animation.FuncAnimation(fig, animate, frames=time, interval=50, repeat=False)
     ani.save("OceanFlowImages/PlaneSearch.gif", writer=animation.PillowWriter(fps=10))
     plt.show()
 
@@ -170,7 +172,7 @@ def plot_crash_coordinates_gauss_prior(u_3d, v_3d, plane_crash_coordinates, hype
     sig2 = hyperparameters["sig2"][0:2]
     fig, axes = plt.subplots(nrows=1, ncols=2, sharex=True, sharey=True)
     x, y = plane_crash_coordinates
-    for array, dir, color, ax, param_l, param_s in zip([u_3d, v_3d], ["U", "V"], ['b', 'r'], axes, l2, sig2):
+    for array, direction, color, ax, param_l, param_s in zip([u_3d, v_3d], ["U", "V"], ['b', 'r'], axes, l2, sig2):
         velocity = array[x, y, :]
         t = len(velocity)
         time = np.arange(t).reshape(-1, 1)
@@ -179,7 +181,7 @@ def plot_crash_coordinates_gauss_prior(u_3d, v_3d, plane_crash_coordinates, hype
         f_prior = np.dot(L, rng.normal(size=(t, 3)))
         ax.plot(time, velocity, c=color, linewidth=1.5)
         ax.plot(time, f_prior, linewidth=.75, alpha=.75)
-        ax.set_title(f"{dir} Direction - l2 = {param_l}, sig2 = {param_s}")
+        ax.set_title(f"{direction} Direction - l2 = {param_l}, sig2 = {param_s}")
     plt.suptitle(f"Gaussian Prior for [{x}, {y}]")
     plt.savefig(f"OceanFlowImages/gaussian_prior.png", format="png")
     plt.show()
@@ -193,24 +195,24 @@ def plot_crash_coordinates_gauss_posterior(u_3d, v_3d, plane_crash_coordinates, 
     x, y = plane_crash_coordinates
     n = 1000
     for array, dir, color, ax, l_param, s_param in zip([u_3d, v_3d], ["U", "V"], ['b', 'r'], axes, l2, sig2):
-        Ytrain = array[x, y, :]  # aka velocity
-        t = len(Ytrain)
-        Xtrain = np.arange(t).reshape(-1, 1)  # aka time
-        Xtest = np.linspace(0, t, n).reshape(-1, 1)
-        K = OceanFlow_utils.compute_kernel(Xtrain, Xtrain, l_param, s_param)
-        K_ss = OceanFlow_utils.compute_kernel(Xtest, Xtest, l_param, s_param)
-        K_s = OceanFlow_utils.compute_kernel(Xtrain, Xtest, l_param, s_param)
+        ytrain = array[x, y, :]  # aka velocity
+        t = len(ytrain)
+        xtrain = np.arange(t).reshape(-1, 1)  # aka time
+        xtest = np.linspace(0, t, n).reshape(-1, 1)
+        K = OceanFlow_utils.compute_kernel(xtrain, xtrain, l_param, s_param)
+        K_ss = OceanFlow_utils.compute_kernel(xtest, xtest, l_param, s_param)
+        K_s = OceanFlow_utils.compute_kernel(xtrain, xtest, l_param, s_param)
         L = np.linalg.cholesky(K + .00005 * np.eye(t))  # 100 x 100
         Lk = np.linalg.solve(L, K_s)  # 100 x 1000
-        mu = np.dot(Lk.T, np.linalg.solve(L, Ytrain)).reshape((n,))  # 1000
+        mu = np.dot(Lk.T, np.linalg.solve(L, ytrain)).reshape((n,))  # 1000
         s2 = np.diag(K_ss) - np.sum(Lk ** 2, axis=0)
-        stdv = np.sqrt(s2)
+        std_dev = np.sqrt(s2)
         L = np.linalg.cholesky(K_ss + 1e-6 * np.eye(n) - np.dot(Lk.T, Lk))  # 1000 x 1000
         f_post = mu.reshape(-1, 1) + np.dot(L, np.random.normal(size=(n, 3)))  # 1000 x 3
-        ax.plot(Xtrain, Ytrain, c=color, linewidth=1.5)
-        ax.plot(Xtest, f_post, linewidth=1)
+        ax.plot(xtrain, ytrain, c=color, linewidth=1.5)
+        ax.plot(xtest, f_post, linewidth=1)
         ax.set_title(f"{dir} Direction - l2 = {l_param}, sig2 = {s_param}")
-        ax.fill_between(Xtest.flat, mu - 3 * stdv, mu + 3 * stdv, color="#dddddd")
+        ax.fill_between(xtest.flat, mu - 3 * std_dev, mu + 3 * std_dev, color="#dddddd")
     plt.suptitle(f"Gaussian Posterior for [{x}, {y}] +/- 3 Std Devs")
     plt.savefig(f"OceanFlowImages/{filename}.png", format="png")
     plt.show()
@@ -267,7 +269,7 @@ def Kfold_function(direction_vec, l2=None, sig2=None, tau=None, hyperparameters=
         L = np.linalg.cholesky(K_train + tau * np.eye(train_len))
         Lk = np.linalg.solve(L, K_cross)
         mu = np.dot(Lk.T, np.linalg.solve(L, train_labels))
-        stdv = np.sqrt(np.diag(K_test) - np.sum(Lk ** 2, axis=0))
+        std_dev = np.sqrt(np.diag(K_test) - np.sum(Lk ** 2, axis=0))
         L_final = np.linalg.cholesky(K_test + tau * np.eye(test_len) - np.dot(Lk.T, Lk))
         f_post = mu.reshape(-1, 1) + L_final @ np.random.normal(size=(test_len, 1))
         log_like = OceanFlow_utils.get_log_likelihood(f_post, train_labels, K_train, K_test, K_cross, tau)
@@ -275,7 +277,7 @@ def Kfold_function(direction_vec, l2=None, sig2=None, tau=None, hyperparameters=
         if plot:
             plt.plot(np.arange(len(direction_vec)), direction_vec, lw=3)
             plt.plot(test, f_post)
-            plt.gca().fill_between(test.flat, mu - 3 * stdv, mu + 3 * stdv, color="#dddddd")
+            plt.gca().fill_between(test.flat, mu - 3 * std_dev, mu + 3 * std_dev, color="#dddddd")
             plt.plot(test, mu, 'r--', lw=2)
             plt.show()
 
@@ -306,8 +308,8 @@ def hyperparameter_optimization(direction_vector, direction, hyperparameters):
 
     max_likelihood = {"max_likelihood": np.max(log_like)}
     max_log_index = np.where(log_like == max_likelihood["max_likelihood"])
-    max_likelihood["l2"] = np.round(l2_mesh[max_log_index[0], max_log_index[1]],1)
-    max_likelihood["sig2"] = np.round(sig2_mesh[max_log_index[0], max_log_index[1]],1)
+    max_likelihood["l2"] = np.round(l2_mesh[max_log_index[0], max_log_index[1]], 1)
+    max_likelihood["sig2"] = np.round(sig2_mesh[max_log_index[0], max_log_index[1]], 1)
     max_likelihood["tau"] = tau
 
     fig, ax = plt.subplots()
@@ -359,11 +361,11 @@ def main():
 
     # -------------------------------------------------------------------------------------------------------------#
 
-    #ocean_streamplots(*uv_mask_data)
+    ocean_streamplots(*uv_mask_data)
 
     # -------------------------------------------------------------------------------------------------------------#
 
-    #correlations = find_dipoles(*uv_mask_data, plot=True)
+    correlations = find_dipoles(*uv_mask_data, plot=True)
 
     # -------------------------------------------------------------------------------------------------------------#
 
@@ -371,7 +373,7 @@ def main():
     # that shows where the flow possibly took the parts as a function of the timestep and assumed variance
 
     plane_crash_coordinates = [400, 400]
-    #plane_crash(*uv_mask_data, plane_crash_coordinates)
+    plane_crash(*uv_mask_data, plane_crash_coordinates)
 
     # -------------------------------------------------------------------------------------------------------------#
     # The time steps are quite far apart, so you want to interpolate between seemingly random signals. How do you do
