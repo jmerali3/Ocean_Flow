@@ -5,8 +5,8 @@ The ocean is complicated, expansive, and powerful. It is also random and mysteri
 <p align="center">
 <img src="OceanFlowImages/the_ocean.jpeg" width="500">
 </p>
-<p align="center">
-Source: Pexels.com
+<p align="center" style="font-size:10px">
+Pexels.com
 </p>
 
 
@@ -122,7 +122,7 @@ One method of hyperparameter selection is to perform a [K-Fold Cross-Validation]
 <p align="center">
 <img src="OceanFlowImages/KFold_Ex.png" width="500" class="center">
 </p>
-<p align="center">
+<p align="center" " style="font-size:10px">
 Source: Rebecca Patro - Towards Data Science
 </p>
 
@@ -158,7 +158,7 @@ Finally, we have the parameters that will give us the best fit. Let's plot the G
 
 This is it! This is our model for the point [400, 400]
 
-We could fit a model for every single point in the grid and have continuous estimates of the flow of the ocean in this entire 1500 km x 1500 km grid of ocean.
+We could fit a model for every single point in the grid and have continuous estimates of the flow of the ocean in this entire 1500 km x 1500 km grid.
 
 ###### Sources
 
