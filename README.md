@@ -65,8 +65,8 @@ The key idea here is that if two values are deemed to be similar by the kernel c
 Ocean flow is a great candidate for being modeled by a Gaussian process because the noisy signal requires a more unconstrained approach to modeling. Ocean flow is a function of numerous random elements like temperature, barometric pressure, cloud cover, etc. The sum off all these yields Gaussian distribution ([Central Limit Theorem](https://en.wikipedia.org/wiki/Central_limit_theorem)).
 
 The Gaussian prior is sampling data from a Gaussian distribution with mean = 0 and a variance specified by the kernel covariance matrix, which is constructed with two hyperparameters: l<sup>2</sup> and σ<sup>2</sup> or length scale and variance. It is the model *before* the joint distribution is created from the training data.
-<p>
-<center><img src="OceanFlowImages/gaussian_prior.png" width="500" class="center"></center>
+<p align="center">
+<img src="OceanFlowImages/gaussian_prior.png" width="500">
 </p>
 <p>
 These appear to be just noisy trends, but the hyperparameters chosen clearly have a large impact on the model even without any data. We'll get into this in step 7.
@@ -80,8 +80,8 @@ The Gaussian posterior are values sampled from the joint probability distributio
 We are now continuously sampling from a joint distribution that takes into account the ground truth data to get values at a much higher granularity.
 
 Let's look at the same posterior model using the same hyperparameters as before.
-<p>
-<center><img src="OceanFlowImages/gaussian_post.png" width="500" class="center"></center>
+<p align="center">
+<img src="OceanFlowImages/gaussian_post.png" width="500">
 </p>
 
 A definite improvement! The grey error bands are 3 standard deviations away, and they seem to fit the model fairly well.
@@ -97,8 +97,8 @@ The kernel function will input an Nx1 matrix and return a symmetric, semi-defini
 
 In this particular model, I chose to use a radial basis function kernel, which has two hyperparameters. The l<sup>2</sup> or length scale term indicates how fast the covariance decays as a function of the square distance between the points, and σ<sup>2</sup> determines the variance at the diagonals. This is visualized below in the grid of heatmaps, which shows a N=10 kernel with varying hyperparameters.
 
-<p>
-<center><img src="OceanFlowImages/Kernel_Heatmap.png" width="500" class="center"></center>
+<p align="center">
+<img src="OceanFlowImages/Kernel_Heatmap.png" width="500">"
 </p>
 
 [RBF Kernel](https://en.wikipedia.org/wiki/Radial_basis_function_kernel) - description of the kernel used in this model
@@ -110,18 +110,20 @@ In this particular model, I chose to use a radial basis function kernel, which h
 
 One method of hyperparameter selection is to perform a [K-Fold Cross-Validation](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.KFold.html), which leaves out a 'fold' of the training data and calculates how well the model performs.
 
-<p>
+<p align="center">
 <center><img src="OceanFlowImages/KFold_Ex.png" width="500" class="center"></center>
 <center>Source: Rebecca Patro - Towards Data Science</center>
 </p>
 
-But wait, what exactly is the error function here - how do we gauge how well the model performs? Enter maximizing the log-likelihood - this metric tells us the [logarithm of the] likelihood of seeing the posterior function from each iteration of the cross-validation, given the known training data, the training covariance matrix, and the cross-covariance matrix between the training and [artificially] unseen data and takes into account both the model-fit and model-complexity. The implementation can be seen in the get_log_likelihood function in OceanFlow_utils.py
+But wait, what exactly is the error function here - how do we gauge how well the model performs? Enter maximizing the log-likelihood - this metric tells us the [logarithm of the] likelihood of seeing the posterior function from each iteration of the cross-validation, given the known training data, the training covariance matrix, and the cross-covariance matrix between the training and [artificially] unseen data. It also takes into account both the model-fit and model-complexity. The implementation can be seen in the get_log_likelihood function in OceanFlow_utils.py
 
 [Literature on log likelihood](http://www.gaussianprocess.org/gpml/chapters/RW5.pdf)
 
 
-
 ### Step 9 - Hyperparameter Optimization
+
+
+
 
 ### Step 10 - Optimized Gaussian Posterior
 
