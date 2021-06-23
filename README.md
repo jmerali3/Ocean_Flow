@@ -1,15 +1,22 @@
 # Ocean Flow - A Gaussian Process Model
 
-The ocean is a wonderous place - it's mystery
+The ocean is complicated, expansive, and powerful. It is also random and mysterious. This analysis tries to fit a model to this randomness using a machine learning technique called a Gaussian Process Model.
+
+<p align="center">
+<img src="OceanFlowImages/the_ocean.jpeg" width="500">
+</p>
+<p align="center">
+Source: Pexels.com
+</p>
 
 
-###### ELI5 - What is a Gaussian Process?
+#### ELI5 - What is a Gaussian Process?
 You have some data, and there are an infinite number of functions that can fit this data. It could be a straight line, it could be a quadratic curve, it could be a sine wave. Some are better than others. The assumption is that the choice of *function* relative to its *fit* conforms to a Gaussian probability distribution. But we can do better than that - it is actually a conditional Gaussian distribution because it is *conditional* on the known (or training or seen) data points. In other words, the known data gives us some knowledge to construct a joint Gaussian distribution from which to sample.
 
 Okay, maybe ELI18
 
 ### Step 1 - The Data
-The data measures ocean flow velocity in U (east-west) and V (north-south) directions in an approximately 1500 km x 1500 km grid in the Philippines Archipelago.
+This data set contains ocean flow velocity in U (east-west) and V (north-south) directions spanning an approximately 1500 km x 1500 km grid over the Philippines Archipelago.
 
 The data comes in the form of 200 csv files, each of which contains a 504 x 555 grid of velocity data, and one mask file that differentiates land and water.
 
@@ -86,18 +93,18 @@ Let's look at the same posterior model using the same hyperparameters as before.
 <img src="OceanFlowImages/gaussian_post.png" width="500">
 </p>
 
-A definite improvement! The grey error bands are 3 standard deviations away, and they seem to fit the model fairly well.
+A definite improvement!
 </p>
 However, these are actually pretty terrible models. The first is definitely overfitting the data and would be quite inflexible, and the second one is much too noisy. We need to optimize the hyperparameters to get a best-fit model, but first we need to look more closely at how they impact the covariance matrix.
 </p>
 
 ### Step 7 - Visualizing Kernels as Covariance Matrices
 
-The covariance matrix is the multivariate extension to the variance specified in a typical Gaussian distribution. Kernels are essentially a similarity metric and are therefore typically used as covariance matrices in ML (gross over-simplification - a lot of mathematical proof behind this).
+The covariance matrix is the multivariate extension to the variance specified in a typical Gaussian distribution. Kernels are essentially a similarity metric and are therefore typically used as covariance matrices in machine learning (gross over-simplification - a lot of mathematical proof behind this).
 
 The kernel function will input an Nx1 matrix and return a symmetric, semi-definite NxN matrix and with each *(i, j)* entry equal to the covariance between points *(i, j)*. For cross-covariance, the input is an Nx1 and Mx1 matrix that returns a triangular NxM covariance matrix.
 
-In this particular model, I chose to use a radial basis function kernel, which has two hyperparameters. The l<sup>2</sup> or length scale term indicates how fast the covariance decays as a function of the square distance between the points, and σ<sup>2</sup> determines the variance at the diagonals. This is visualized below in the grid of heatmaps, which shows a N=10 kernel with varying hyperparameters.
+In this particular model, I chose to use a radial basis function kernel, which has two hyperparameters. The l<sup>2</sup> or length scale term indicates how fast the covariance decays as a function of the squared distance between the points, and σ<sup>2</sup> determines the variance at the diagonals. This is visualized below in the grid of heatmaps, which shows a N=10 kernel with varying hyperparameters.
 
 <p align="center">
 <img src="OceanFlowImages/Kernel_Heatmap.png" width="500">"
@@ -128,17 +135,14 @@ But wait, what exactly is the error function here - how do we gauge how well the
 
 Now that we have the framework of cross-validation and log likelihood estimation, optimization is straightforward. We grid search over a range of l<sup>2</sup> and σ<sup>2</sup>, which is implemented in the hyperparameter_optimization function.
 
-Below are heatmaps of log likelihoods with varying length scales and variances. There's no monotonic increase and many, many local optimums. There are probably quite a few parameters that would give decent models, and what we found is likely not even the global maximum likelihood.
+Below is a heatmap of log likelihoods with varying length scales and variances for the U direction. There's no monotonic increase and many, many local optimums. There are probably quite a few parameters that would give decent models, and what we found is likely not even the global maximum likelihood.
 
 
 <p align="center">
 <img src="OceanFlowImages/U_Parameter_Optimization_Heatmap.png" width="500">
 </p>
-<p align="center">
-<img src="OceanFlowImages/V_Parameter_Optimization_Heatmap.png" width="500">
-</p>
 
-Another view of log likelihood as a function of hyperparameters. There is a *general* directional improvement with longer length scales.
+This 3-D view of log likelihood in the V direction as a function of hyperparameters shows a *general* directional improvement with longer length scales.
 <p align="center">
 <img src="OceanFlowImages/V_Parameter_Optimization.png" width="500">
 </p>
@@ -152,9 +156,11 @@ Finally, we have the parameters that will give us the best fit. Let's plot the G
 <img src="OceanFlowImages/gaussian_post_optimized.png" width="500">
 </p>
 
+This is it! This is our model for the point [400, 400]
 
+We could fit a model for every single point in the grid and have continuous estimates of the flow of the ocean in this entire 1500 km x 1500 km grid of ocean.
 
-##### Sources
+###### Sources
 
 [Katherine Bailey blog post](https://katbailey.github.io/post/gaussian-processes-for-dummies/) - If you want a slightly more in-depth version
 
