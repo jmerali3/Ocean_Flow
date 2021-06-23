@@ -19,8 +19,9 @@ There are 100 csv files for each direction, and each file represents a particula
 
 It's hard to get a sense of what we are actually looking at here with this data. Let's visualize what the ocean flow looks like using Matplotlib's Streamplots and Animation functionalities. We also weight the "arrows" by the velocity, so we see where the current is strongest and how it changes over time.
 
-<center><img src="OceanFlowImages/Streamplots.gif" width="500"></center>
-
+<p align="center">
+<img src="OceanFlowImages/Streamplots.gif" width="500">
+</p>
 
 ### Step 3 - Dipoles & Correlation
 
@@ -35,9 +36,9 @@ Nothing this impactful exists in the data we have, but it is a good exercise to 
 Imagine there is a hypothetical plane crash in the ocean near the Philippines. A search party knows the location of the accident, but some time has elapsed. Where would be the best place to look after time T = t? We can build a simulation of the ocean flows by using the algorithm described in the docstring of plane_crash in OceanFlow.py
 
 For a plane crash at point [400, 400] with an assumed variance of 10 for x and y directions.
-
-<center><img src="OceanFlowImages/PlaneSearch.gif" width="500" class="center"></center>
-
+<p align="center">
+<img src="OceanFlowImages/PlaneSearch.gif" width="500">
+</p>
 
 ### Step 5 - Gaussian Priors
 
@@ -80,6 +81,7 @@ The Gaussian posterior are values sampled from the joint probability distributio
 We are now continuously sampling from a joint distribution that takes into account the ground truth data to get values at a much higher granularity.
 
 Let's look at the same posterior model using the same hyperparameters as before.
+
 <p align="center">
 <img src="OceanFlowImages/gaussian_post.png" width="500">
 </p>
@@ -111,8 +113,10 @@ In this particular model, I chose to use a radial basis function kernel, which h
 One method of hyperparameter selection is to perform a [K-Fold Cross-Validation](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.KFold.html), which leaves out a 'fold' of the training data and calculates how well the model performs.
 
 <p align="center">
-<center><img src="OceanFlowImages/KFold_Ex.png" width="500" class="center"></center>
-<center>Source: Rebecca Patro - Towards Data Science</center>
+<img src="OceanFlowImages/KFold_Ex.png" width="500" class="center">
+</p>
+<p align="center">
+Source: Rebecca Patro - Towards Data Science
 </p>
 
 But wait, what exactly is the error function here - how do we gauge how well the model performs? Enter maximizing the log-likelihood - this metric tells us the [logarithm of the] likelihood of seeing the posterior function from each iteration of the cross-validation, given the known training data, the training covariance matrix, and the cross-covariance matrix between the training and [artificially] unseen data. It also takes into account both the model-fit and model-complexity. The implementation can be seen in the get_log_likelihood function in OceanFlow_utils.py
@@ -122,10 +126,32 @@ But wait, what exactly is the error function here - how do we gauge how well the
 
 ### Step 9 - Hyperparameter Optimization
 
+Now that we have the framework of cross-validation and log likelihood estimation, optimization is straightforward. We grid search over a range of l<sup>2</sup> and σ<sup>2</sup>, which is implemented in the hyperparameter_optimization function.
 
+Below are heatmaps of log likelihoods with varying length scales and variances. There's no monotonic increase and many, many local optimums. There are probably quite a few parameters that would give decent models, and what we found is likely not even the global maximum likelihood.
+
+
+<p align="center">
+<img src="OceanFlowImages/U_Parameter_Optimization_Heatmap.png" width="500">
+</p>
+<p align="center">
+<img src="OceanFlowImages/V_Parameter_Optimization_Heatmap.png" width="500">
+</p>
+
+Another view of log likelihood as a function of hyperparameters. There is a *general* directional improvement with longer length scales.
+<p align="center">
+<img src="OceanFlowImages/V_Parameter_Optimization.png" width="500">
+</p>
 
 
 ### Step 10 - Optimized Gaussian Posterior
+
+Finally, we have the parameters that will give us the best fit. Let's plot the Gaussian posterior from Step 6.
+
+<p align="center">
+<img src="OceanFlowImages/gaussian_post_optimized.png" width="500">
+</p>
+
 
 
 ##### Sources
@@ -133,3 +159,5 @@ But wait, what exactly is the error function here - how do we gauge how well the
 [Katherine Bailey blog post](https://katbailey.github.io/post/gaussian-processes-for-dummies/) - If you want a slightly more in-depth version
 
 [Gaussian Process for Machine Learning by Rasmussen & Williams](http://www.gaussianprocess.org/gpml/chapters/) - If you want the entire textbook
+
+Credit to MITx - Data Analysis: Statistical Methods & Computation for this data and the skills to perform this analysis.

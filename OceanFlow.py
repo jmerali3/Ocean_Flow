@@ -326,8 +326,8 @@ def hyperparameter_optimization(direction_vector, direction, hyperparameters):
     ax.set_yticklabels(list(sig2))
     ax.set_xticks(np.arange(len(l2)))
     ax.set_yticks(np.arange(len(sig2)))
-    ax.set_xlabel("l2")
-    ax.set_ylabel("sig2")
+    ax.set_xlabel('$\l^2$')
+    ax.set_ylabel('$\sigma^2$')
     ax.set_title(f"{direction} Optimum: $\l^2$ - {max_likelihood['l2']} & $\sigma^2$ - {max_likelihood['sig2']}")
     plt.savefig(f"OceanFlowImages/{direction.upper()}_Parameter_Optimization_Heatmap.png", format="png")
     plt.show()
@@ -335,9 +335,9 @@ def hyperparameter_optimization(direction_vector, direction, hyperparameters):
     fig = plt.figure()
     ax = plt.axes(projection='3d')
     ax.plot_surface(l2_mesh, sig2_mesh, log_like, cmap=cm.coolwarm)
-    ax.set_title(f"{direction} Optimum: l2 - {max_likelihood['l2']} sig2 - {max_likelihood['sig2']}")
-    ax.set_xlabel("l2")
-    ax.set_ylabel("sig2")
+    ax.set_title(f"{direction} Optimum: $\l^2$ - {max_likelihood['l2']} & $\sigma^2$ - {max_likelihood['sig2']}")
+    ax.set_xlabel("$\l^2$")
+    ax.set_ylabel("$\sigma^2$")
     ax.set_zlabel("Log Likelihood")
     norm = mpl.colors.Normalize(vmin=np.min(log_like), vmax=max_likelihood["max_likelihood"])
     fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.coolwarm), ax=ax)
@@ -359,6 +359,7 @@ def main():
         9. Optimizes the hyperparameters for both directions to give the highest log likelihood and prints the results
         10. Plots the Gaussian posterior with optimized hyperparameters
         """
+    # Step 1
     try:
         uv_mask_data = np.load("u_3d.npy"), np.load("v_3d.npy"), np.load("mask.npy").astype('bool')
     except FileNotFoundError:
@@ -367,50 +368,40 @@ def main():
 
     u_3d, v_3d, mask = uv_mask_data
 
-    # -------------------------------------------------------------------------------------------------------------#
+    # Step 2
+    ocean_streamplots(*uv_mask_data)
 
-    # ocean_streamplots(*uv_mask_data)
+    # Step 3
+    correlations = find_dipoles(*uv_mask_data, plot=True)
 
-    # -------------------------------------------------------------------------------------------------------------#
-
-    # correlations = find_dipoles(*uv_mask_data, plot=True)
-
-    # -------------------------------------------------------------------------------------------------------------#
-
-
+    # Step 4
     plane_crash_coordinates = [400, 400]
-    # plane_crash(*uv_mask_data, plane_crash_coordinates)
+    plane_crash(*uv_mask_data, plane_crash_coordinates)
 
-    # -------------------------------------------------------------------------------------------------------------#
-
-
+    # Step 5
     l2, sig2 = (10, 1), (1, .1)
     hyperparameters_gaussian_plot = {"l2": l2, "sig2": sig2}
-    # plot_crash_coordinates_gauss_prior(u_3d, v_3d, plane_crash_coordinates, hyperparameters_gaussian_plot)
+    plot_crash_coordinates_gauss_prior(u_3d, v_3d, plane_crash_coordinates, hyperparameters_gaussian_plot)
 
-    # -------------------------------------------------------------------------------------------------------------#
-
+    # Step 6
     plot_crash_coordinates_gauss_posterior(u_3d, v_3d, plane_crash_coordinates, hyperparameters_gaussian_plot,
                                            "gaussian_post")
 
-    # -------------------------------------------------------------------------------------------------------------#
-
+    # Step 7
     # Isolate the data to only look at a 2D array at the specified crash point instead of the entire set
-    crash_u = u_3d[plane_crash_coordinates[0], plane_crash_coordinates[1], :]
-    crash_v = v_3d[plane_crash_coordinates[0], plane_crash_coordinates[1], :]
-
     heatmap_l2 = np.array([50, 30, 10])
     heatmap_sig2 = np.array([30, 20, 10])
-    # kernel_heatmap(10, heatmap_l2, heatmap_sig2)
+    kernel_heatmap(10, heatmap_l2, heatmap_sig2)
 
-
-    # -------------------------------------------------------------------------------------------------------------#
-
+    # Step 8
+    crash_u = u_3d[plane_crash_coordinates[0], plane_crash_coordinates[1], :]
+    crash_v = v_3d[plane_crash_coordinates[0], plane_crash_coordinates[1], :]
     Kfold_hyperparameters = {"l2": 10, "sig2": .05, "tau": 1e-5}
     Kfold_LL = Kfold_function(crash_u, hyperparameters=Kfold_hyperparameters, plot=False)
     print(f"KFold Example - The average log likelihood for l2 = {Kfold_hyperparameters['l2']} and "
           f"sig2 = {Kfold_hyperparameters['l2']} is {Kfold_LL}")
 
+    # Step 9
     l2_opt = np.arange(50, 200, 10)
     sig2_opt = np.arange(30, 180, 10)
     tau_opt = 1e-5
@@ -426,16 +417,10 @@ def main():
     for key, value in max_likelihood_v_params.items():
         print(f"{key}: {value}")
 
-    # Our optimization algorithm has returned an optimal (l2, sig2) of (190, 60) for the U Direction and (190, 50).
-    # Marginal improvements could be made by increasing the granularity of our grid search, but at this point, I feel
-    # like these parameters are good enough for us to begin our model fit.
-    # -------------------------------------------------------------------------------------------------------------#
-    # Let's plot the Gaussian posteriors with these new parameters
-
+    # Step 10
     max_likelihood_params = OceanFlow_utils.zip_dict(max_likelihood_u_params, max_likelihood_v_params)
     plot_crash_coordinates_gauss_posterior(u_3d, v_3d, plane_crash_coordinates, max_likelihood_params,
                                            "gaussian_post_optimized")
-
 
 if __name__ == "__main__":
     main()
