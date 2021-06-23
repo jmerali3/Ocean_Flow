@@ -118,8 +118,8 @@ def find_dipoles(u_3d, v_3d, mask, plot=False):
                   f"u-corr coefficient: {corr_u}; v-corr coefficient: {corr_v}")
             marker = "+" if corr_u > 0 else "_"
             ax.scatter([x1, x2], [y1, y2], marker=marker, s=80)
-        plt.savefig("OceanFlowImages/Dipoles.png", format='png', transparent=True)
         plt.title("Positive and Negative Dipoles")
+        plt.savefig("OceanFlowImages/Dipoles.png", format='png', transparent=True)
         plt.show()
 
     return correlations_dict
@@ -133,6 +133,8 @@ def plane_crash(u_3d, v_3d, mask, plane_crash_coordinates, variance=10, num_poin
     distribution specified by mu_x, mu_y, and variance (sigma is assumed to be the same for x and y directions).
     It then computes the flow path of each of those points using the utility function compute_movement
     Plots the resulting data on top of the mask and animates it for 100 time steps
+
+    This simulation assumes velocity of 1 grid space / time unit. If grid space = 3 kms, time steps are 3 hrs apart.
 
     :param u_3d: 3D array (x,y,t)
     :param v_3d: 3D array (x,y,t)
@@ -174,7 +176,7 @@ def plot_crash_coordinates_gauss_prior(u_3d, v_3d, plane_crash_coordinates, hype
     """Will only use the first two parameters of l2 and sig2"""
     l2 = hyperparameters["l2"][0:2]
     sig2 = hyperparameters["sig2"][0:2]
-    fig, axes = plt.subplots(nrows=1, ncols=2, sharex=True, sharey=True)
+    fig, axes = plt.subplots(nrows=1, ncols=2)
     x, y = plane_crash_coordinates
     for array, direction, color, ax, param_l, param_s in zip([u_3d, v_3d], ["U", "V"], ['b', 'r'], axes, l2, sig2):
         velocity = array[x, y, :]
@@ -185,8 +187,9 @@ def plot_crash_coordinates_gauss_prior(u_3d, v_3d, plane_crash_coordinates, hype
         f_prior = np.dot(L, rng.normal(size=(t, 3)))
         ax.plot(time, velocity, c=color, linewidth=1.5)
         ax.plot(time, f_prior, linewidth=.75, alpha=.75)
-        ax.set_title(f"{direction} Direction - l2 = {param_l}, sig2 = {param_s}")
+        ax.set_title(f"{direction} Direction \n $\l^2$ = {param_l} & $\sigma^2$ = {param_s}")
     plt.suptitle(f"Gaussian Prior for [{x}, {y}]")
+    plt.tight_layout()
     plt.savefig(f"OceanFlowImages/gaussian_prior.png", format="png")
     plt.show()
 
@@ -198,14 +201,14 @@ def plot_crash_coordinates_gauss_posterior(u_3d, v_3d, plane_crash_coordinates, 
     fig, axes = plt.subplots(nrows=1, ncols=2)
     x, y = plane_crash_coordinates
     n = 1000
-    for array, dir, color, ax, l_param, s_param in zip([u_3d, v_3d], ["U", "V"], ['b', 'r'], axes, l2, sig2):
+    for array, dir, color, ax, param_l, param_s in zip([u_3d, v_3d], ["U", "V"], ['b', 'r'], axes, l2, sig2):
         ytrain = array[x, y, :]  # aka velocity
         t = len(ytrain)
         xtrain = np.arange(t).reshape(-1, 1)  # aka time
         xtest = np.linspace(0, t, n).reshape(-1, 1)
-        K = OceanFlow_utils.compute_kernel(xtrain, xtrain, l_param, s_param)
-        K_ss = OceanFlow_utils.compute_kernel(xtest, xtest, l_param, s_param)
-        K_s = OceanFlow_utils.compute_kernel(xtrain, xtest, l_param, s_param)
+        K = OceanFlow_utils.compute_kernel(xtrain, xtrain, param_l, param_s)
+        K_ss = OceanFlow_utils.compute_kernel(xtest, xtest, param_l, param_s)
+        K_s = OceanFlow_utils.compute_kernel(xtrain, xtest, param_l, param_s)
         L = np.linalg.cholesky(K + .00005 * np.eye(t))  # 100 x 100
         Lk = np.linalg.solve(L, K_s)  # 100 x 1000
         mu = np.dot(Lk.T, np.linalg.solve(L, ytrain)).reshape((n,))  # 1000
@@ -215,9 +218,10 @@ def plot_crash_coordinates_gauss_posterior(u_3d, v_3d, plane_crash_coordinates, 
         f_post = mu.reshape(-1, 1) + np.dot(L, np.random.normal(size=(n, 3)))  # 1000 x 3
         ax.plot(xtrain, ytrain, c=color, linewidth=1.5)
         ax.plot(xtest, f_post, linewidth=1)
-        ax.set_title(f"{dir} Direction - l2 = {l_param}, sig2 = {s_param}")
+        ax.set_title(f"{dir} Direction \n $\l^2$ = {param_l} & $\sigma^2$ = {param_s}")
         ax.fill_between(xtest.flat, mu - 3 * std_dev, mu + 3 * std_dev, color="#dddddd")
-    plt.suptitle(f"Gaussian Posterior for [{x}, {y}] +/- 3 Std Devs")
+    plt.suptitle(f"Gaussian Posterior for [{x}, {y}] +/- 3$\sigma$")
+    plt.tight_layout()
     plt.savefig(f"OceanFlowImages/{filename}.png", format="png")
     plt.show()
 
@@ -235,7 +239,7 @@ def kernel_heatmap(dim, l2, sig2):
     for l2_outer, s2_outer, ax_outer in zip(l2_mesh, sig2_mesh, axes):
         for l2_inner, s2_inner, ax_inner in zip(l2_outer, s2_outer, ax_outer):
             kernel = OceanFlow_utils.compute_kernel(dummy_vector, dummy_vector, l2_inner, s2_inner)
-            ax_inner.set_title(f"l2 = {l2_inner}, sig2 = {s2_inner}")
+            ax_inner.set_title(f"$\l^2 = {l2_inner}, \sigma^2$ = {s2_inner}")
             sns.heatmap(kernel, ax=ax_inner, square=True, cmap="Blues", vmax=sig2.max())
     plt.suptitle(f"N = {dim} Kernel Covariance Matrix")
     fig.tight_layout()
@@ -324,7 +328,7 @@ def hyperparameter_optimization(direction_vector, direction, hyperparameters):
     ax.set_yticks(np.arange(len(sig2)))
     ax.set_xlabel("l2")
     ax.set_ylabel("sig2")
-    ax.set_title(f"{direction} Optimum: l2 - {max_likelihood['l2']} sig2 - {max_likelihood['sig2']}")
+    ax.set_title(f"{direction} Optimum: $\l^2$ - {max_likelihood['l2']} & $\sigma^2$ - {max_likelihood['sig2']}")
     plt.savefig(f"OceanFlowImages/{direction.upper()}_Parameter_Optimization_Heatmap.png", format="png")
     plt.show()
 
@@ -369,51 +373,23 @@ def main():
 
     # -------------------------------------------------------------------------------------------------------------#
 
-    correlations = find_dipoles(*uv_mask_data, plot=True)
+    # correlations = find_dipoles(*uv_mask_data, plot=True)
 
     # -------------------------------------------------------------------------------------------------------------#
 
-    # Say you have this data and a plane crashed at 400, 400. Where do you look for parts? Let's create as simulation
-    # that shows where the flow possibly took the parts as a function of the timestep and assumed variance
 
     plane_crash_coordinates = [400, 400]
-    plane_crash(*uv_mask_data, plane_crash_coordinates)
+    # plane_crash(*uv_mask_data, plane_crash_coordinates)
 
     # -------------------------------------------------------------------------------------------------------------#
-    # The time steps are quite far apart, so you want to interpolate between seemingly random signals. How do you do
-    # this? Regression methods are parametric and random noise is infinitely parametric. Where would you even begin?
-    # Enter Gaussian Process, a non-parametric approach that "defines a prior over functions, which can be converted
-    # into a posterior over functions once we have seen some data"
-    #
-    # Ocean flow is a great candidate for being modeled by a Gaussian process because the noisy signal requires a
-    # more unconstrained approach to modeling than any regression could provide. Ocean flow is a function of numerous
-    # random elements like temperature, barometric pressure, cloud cover, etc. The sum off all these --> Gaussian
 
-    # Our "prior" estimate before any data is observed is just a Gaussian distribution with mean = 0 and an arbitrary
-    # covariance between points. This covariance matrix can be approximated by a what's called a Kernel, which gives
-    # us a measure of "similarity" between all points in a set. There are certain hyperparameters,
-    # namely the length scale l^2 and sig^2 (get name) that define the Kernel.
-    # For this example, we will use the radial basis function (RBF) kernel because it is infinitely differentiable
-    # (scaled to infinite dimension) and fits noisy models really well.
-    # The key assumption here is that points close in time indices should be correlated with each other. Therefore,
-    # if we know the flow at say times t = 4 and t = 5, we figure the flow at t = 4.5 will be somewhere in between.
-    # And t=4.5 also has some decaying dependence on t = 3, t = 2, etc. We need to map this covariance somehow
-    # Th next step will be to optimize the model by finding the best hyperparameters.
-    # Note, that in this example, all the data points are equally spaced, but that need not be true.
 
-    # First, let's get a sense of what the prior distribution looks like with arbitrary l2 and s2. This is the model
-    # before any data has been incorporated
     l2, sig2 = (10, 1), (1, .1)
     hyperparameters_gaussian_plot = {"l2": l2, "sig2": sig2}
-    plot_crash_coordinates_gauss_prior(u_3d, v_3d, plane_crash_coordinates, hyperparameters_gaussian_plot)
+    # plot_crash_coordinates_gauss_prior(u_3d, v_3d, plane_crash_coordinates, hyperparameters_gaussian_plot)
 
-    # It's clear that a higher length scale smooth smooths out the curves and a lower sigma makes the distribution
-    # tighter. This model assumed the mean = 0, which is clearly not the case. We can incorporate our measurement data
-    # and find a posterior Gaussian model. While the first plot looks like it fits the data well, it is actually a poor
-    # model, as it overfits the data.
+    # -------------------------------------------------------------------------------------------------------------#
 
-    # Let's take a look at what the posterior function looks like with the same hyperparameters. In other words,
-    # after we see some data, how has the model improved?
     plot_crash_coordinates_gauss_posterior(u_3d, v_3d, plane_crash_coordinates, hyperparameters_gaussian_plot,
                                            "gaussian_post")
 
@@ -423,30 +399,12 @@ def main():
     crash_u = u_3d[plane_crash_coordinates[0], plane_crash_coordinates[1], :]
     crash_v = v_3d[plane_crash_coordinates[0], plane_crash_coordinates[1], :]
 
-    # Let's dive deeper into the Kernel function and what it is telling us
-    # The kernel function will input an Nx1 matrix and return a symmetric NxN matrix with all diagonals = 1
-    # and each i,j entry is the covariance between points i,j
-
-    # Let's visualize this
-
     heatmap_l2 = np.array([50, 30, 10])
     heatmap_sig2 = np.array([30, 20, 10])
-    kernel_heatmap(10, heatmap_l2, heatmap_sig2)
+    # kernel_heatmap(10, heatmap_l2, heatmap_sig2)
 
-    # We can see that the length scale defines how quickly the covariance decays as the distance between points gets
-    # further away. We can also see that sigma^2 defines the magnitude of the covariance. The diagonals will be
-    # equal to sigma^2 and decay from there. A higher covariance means a wider, more noisier looking trend.
 
     # -------------------------------------------------------------------------------------------------------------#
-
-    # So what are the hyperparameters that will yield the best model? For that, we need to define a metric by which
-    # to gauge our predictions - a measure of how far off the predictions are from ground truth. We will use the
-    # log-likelihood as the measurement of how good the fit is by using K-Fold cross-validation. The idea here is to
-    # artificially remove some of the data from our ground truth training data, make the prediction with a given set
-    # of hyperparameters, and compare the goodness of fit by using log-likelihood estimation - or what is the
-    # probability of seeing our prediction given the training data, training covariance, and cross-covariance. We
-    # repeat this process for all sets of hyperparameters and for 25 K-folds of the data.
-    # [Insert explanation about log likelihood]
 
     Kfold_hyperparameters = {"l2": 10, "sig2": .05, "tau": 1e-5}
     Kfold_LL = Kfold_function(crash_u, hyperparameters=Kfold_hyperparameters, plot=False)
