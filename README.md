@@ -6,7 +6,7 @@ The ocean is complicated, expansive, and powerful. It is also random and mysteri
 <img src="OceanFlowImages/the_ocean.jpeg" width="500">
 </p>
 <p align="center" style="font-size:10px">
-Pexels.com
+Source: Pexels.com
 </p>
 
 
@@ -36,7 +36,9 @@ The [Indian Ocean Dipole](https://en.wikipedia.org/wiki/Indian_Ocean_Dipole) is 
 
 Nothing this impactful exists in the data we have, but it is a good exercise to see if there are some long-range correlations in this data. The algorithm uses random sampling instead of calculating a (504x555)<sup>2</sup> correlation matrix and is explained in more detail in the docstring of the function titled find_dipoles in OceanFlow.py
 
-![Indian Ocean Dipole](OceanFlowImages/Dipoles.png)
+<p align="center">
+<img src="OceanFlowImages/Dipoles.png" width="500">
+</p>
 
 ### Step 4 - A Plane Crash!
 
