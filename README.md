@@ -34,7 +34,7 @@ It's hard to get a sense of what we are actually looking at here with this data.
 
 The [Indian Ocean Dipole](https://en.wikipedia.org/wiki/Indian_Ocean_Dipole) is a temperature anomaly in which the eastern and western regions of the Indian Ocean are extremely negatively correlated, which has far-reaching climate impacts that can be felt as far as South America through its impact on El Nino.
 
-Nothing this impactful exists in the data we have, but it is a good exercise to see if there are some long-range correlations in this data. The algorithm uses random sampling instead of calculating a (504x555)<sup>2</sup> correlation matrix and is explained in more detail in the docstring of the function titled find_dipoles in OceanFlow.py
+Nothing this impactful exists in the data we have, but it is a good exercise to see if there are some long-range correlations in this data. The algorithm uses random sampling instead of calculating a (504x555)<sup>2</sup> correlation matrix and is explained in more detail in the docstring of the function titled [find_dipoles](https://github.com/jmerali3/Ocean_Flow/blob/841ab6ee56a8293ac6b4aa72879ae368686fe1c4/OceanFlow.py#L47).
 
 <p align="center">
 <img src="OceanFlowImages/Dipoles.png" width="500">
@@ -42,7 +42,7 @@ Nothing this impactful exists in the data we have, but it is a good exercise to 
 
 ### Step 4 - A Plane Crash!
 
-Imagine there is a hypothetical plane crash in the ocean near the Philippines. A search party knows the location of the accident, but some time has elapsed. Where would be the best place to look after time T = t? We can build a simulation of the ocean flows by using the algorithm described in the docstring of plane_crash in OceanFlow.py
+Imagine there is a hypothetical plane crash in the ocean near the Philippines. A search party knows the location of the accident, but some time has elapsed. Where would be the best place to look after time T = t? We can build a simulation of the ocean flows by using the algorithm described in the docstring of [plane_crash](https://github.com/jmerali3/Ocean_Flow/blob/841ab6ee56a8293ac6b4aa72879ae368686fe1c4/OceanFlow.py#L128).
 
 For a plane crash at point [400, 400] with an assumed variance of 10 for x and y directions.
 <p align="center">
@@ -85,7 +85,7 @@ These appear to be just noisy trends, but the hyperparameters chosen clearly hav
 
 ### Step 6 - Gaussian Posterior
 
-The Gaussian posterior are values sampled from the joint probability distribution of the functions of seen and unseen data. Some pretty detailed linear algebra gets us to this point, and if you are curious, you can read more about it in the sources listed at the end of this README.
+The Gaussian posterior are values sampled from the joint probability distribution of the functions of seen and unseen data. Some pretty detailed linear algebra gets us to this point, and if you are curious, you can read more about it in the sources listed at the end of this README. The implementation is in the function [plot_crash_coordinates_gauss_posterior](https://github.com/jmerali3/Ocean_Flow/blob/841ab6ee56a8293ac6b4aa72879ae368686fe1c4/OceanFlow.py#L197).
 
 We are now continuously sampling from a joint distribution that takes into account the ground truth data to get values at a much higher granularity.
 
@@ -106,7 +106,7 @@ The covariance matrix is the multivariate extension to the variance specified in
 
 The kernel function will input an Nx1 matrix and return a symmetric, semi-definite NxN matrix and with each *(i, j)* entry equal to the covariance between points *(i, j)*. For cross-covariance, the input is an Nx1 and Mx1 matrix that returns a triangular NxM covariance matrix.
 
-In this particular model, I chose to use a radial basis function kernel, which has two hyperparameters. The l<sup>2</sup> or length scale term indicates how fast the covariance decays as a function of the squared distance between the points, and σ<sup>2</sup> determines the variance at the diagonals. This is visualized below in the grid of heatmaps, which shows a N=10 kernel with varying hyperparameters.
+In this particular model, I chose to use a [radial basis function kernel](https://github.com/jmerali3/Ocean_Flow/blob/841ab6ee56a8293ac6b4aa72879ae368686fe1c4/OceanFlow_utils.py#L86), which has two hyperparameters. The l<sup>2</sup> or length scale term indicates how fast the covariance decays as a function of the squared distance between the points, and σ<sup>2</sup> determines the variance at the diagonals. This is visualized below in the grid of heatmaps, which shows a N=10 kernel with varying hyperparameters.
 
 <p align="center">
 <img src="OceanFlowImages/Kernel_Heatmap.png" width="500">"
@@ -119,7 +119,7 @@ In this particular model, I chose to use a radial basis function kernel, which h
 
 ### Step 8 - K-Fold Cross-Validation & Log Likelihood
 
-One method of hyperparameter selection is to perform a [K-Fold Cross-Validation](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.KFold.html), which leaves out a 'fold' of the training data and calculates how well the model performs.
+One method of hyperparameter selection is to perform a [K-Fold Cross-Validation](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.KFold.html), which leaves out a 'fold' of the training data and calculates how well the model performs. This code uses SKLearn's implementation to help with this.
 
 <p align="center">
 <img src="OceanFlowImages/KFold_Ex.png" width="500" class="center">
@@ -128,14 +128,14 @@ One method of hyperparameter selection is to perform a [K-Fold Cross-Validation]
 Source: Rebecca Patro - Towards Data Science
 </p>
 
-But wait, what exactly is the error function here - how do we gauge how well the model performs? Enter maximizing the log-likelihood - this metric tells us the [logarithm of the] likelihood of seeing the posterior function from each iteration of the cross-validation, given the known training data, the training covariance matrix, and the cross-covariance matrix between the training and [artificially] unseen data. It also takes into account both the model-fit and model-complexity. The implementation can be seen in the get_log_likelihood function in OceanFlow_utils.py
+But wait, what exactly is the error function here - how do we gauge how well the model performs? Enter maximizing the log-likelihood - this metric tells us the [logarithm of the] likelihood of seeing the posterior function from each iteration of the cross-validation, given the known training data, the training covariance matrix, and the cross-covariance matrix between the training and [artificially] unseen data. It also takes into account both the model-fit and model-complexity. The implementation can be seen in the [get_log_likelihood](https://github.com/jmerali3/Ocean_Flow/blob/841ab6ee56a8293ac6b4aa72879ae368686fe1c4/OceanFlow_utils.py#L68) function.
 
 [Literature on log likelihood](http://www.gaussianprocess.org/gpml/chapters/RW5.pdf)
 
 
 ### Step 9 - Hyperparameter Optimization
 
-Now that we have the framework of cross-validation and log likelihood estimation, optimization is straightforward. We grid search over a range of l<sup>2</sup> and σ<sup>2</sup>, which is implemented in the hyperparameter_optimization function.
+Now that we have the framework of cross-validation and log likelihood estimation, optimization is straightforward. We grid search over a range of l<sup>2</sup> and σ<sup>2</sup>, which is implemented in the [hyperparameter_optimization](https://github.com/jmerali3/Ocean_Flow/blob/841ab6ee56a8293ac6b4aa72879ae368686fe1c4/OceanFlow.py#L295) function.
 
 Below is a heatmap of log likelihoods with varying length scales and variances for the U direction. There's no monotonic increase and many, many local optimums. There are probably quite a few parameters that would give decent models, and what we found is likely not even the global maximum likelihood.
 
