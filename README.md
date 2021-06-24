@@ -11,7 +11,7 @@ Source: Pexels.com
 
 
 #### ELI5 - What is a Gaussian Process?
-You have some data, and there are an infinite number of functions that can fit this data. The function could look like a straight line, a quadratic curve, or a sine wave. Some fit better than others. The assumption is that the choice of *function* conforms to a Gaussian probability distribution. But we can do better than that - it is actually a conditional Gaussian distribution because it is *conditional* on the known (or training or seen) data points. In other words, the known data gives us some information from which to construct a joint Gaussian distribution.
+You have some data, and there are an infinite number of functions that can fit this data. The function could look like a straight line, a quadratic curve, or a sine wave. Some fit better than others. The assumption is that the choice of *function* conforms to a Gaussian probability distribution. But we can do better than that - it is actually a conditional Gaussian distribution because it is *conditional* on the known (or training or seen) data points. In other words, the known data gives us some information from which to construct a joint Gaussian distribution. We sample from this distribution, and we have our model along with some nice error bands.
 
 Okay, maybe ELI18
 
