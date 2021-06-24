@@ -11,7 +11,7 @@ Source: Pexels.com
 
 
 #### ELI5 - What is a Gaussian Process?
-You have some data, and there are an infinite number of functions that can fit this data. It could be a straight line, it could be a quadratic curve, it could be a sine wave. Some are better than others. The assumption is that the choice of *function* relative to its *fit* conforms to a Gaussian probability distribution. But we can do better than that - it is actually a conditional Gaussian distribution because it is *conditional* on the known (or training or seen) data points. In other words, the known data gives us some knowledge to construct a joint Gaussian distribution from which to sample.
+You have some data, and there are an infinite number of functions that can fit this data. The function could look like a straight line, a quadratic curve, or a sine wave. Some fit better than others. The assumption is that the choice of *function* conforms to a Gaussian probability distribution. But we can do better than that - it is actually a conditional Gaussian distribution because it is *conditional* on the known (or training or seen) data points. In other words, the known data gives us some information from which to construct a joint Gaussian distribution.
 
 Okay, maybe ELI18
 
@@ -51,7 +51,7 @@ For a plane crash at point [400, 400] with an assumed variance of 10 for x and y
 
 ### Step 5 - Gaussian Priors
 
-In the last step, we made a pretty large assumption about the interval of the time steps. What if we only had data every 3 days or longer - we would need a model that can interpolate this noisy data. The typical method that might come to mind is some kind of regression, but it's obvious after looking at the random, cyclic nature of the data that we need a more flexible method.
+In the last step, we made a pretty large assumption about the interval of the time steps. What if we only had data every 3 days or longer - we would need a model that can interpolate this noisy data.
 
 Enter Gaussian Process, a non-parametric approach that "defines a prior over functions, which can be converted into a posterior over functions once we have seen some data (K. Murphy)"
 
@@ -72,7 +72,7 @@ infinitely many other points, as if you would have taken them all into account!
 
 The key idea here is that if two values are deemed to be similar by the kernel covariance matrix (more on that later), then the outputs of those values in the function should also be correlated. In other words, if two instances in time are close together, their resulting flow velocity should be similar. Sounds intuitive, right? We just have to find the joint probability distribution over the functions. Our known, truth, or seen data are the data in the 3-D matrices, and any unknown or unseen data are any values in between (eg - we know the flow at t=4 and t=5, but t=4.5 is "unseen").
 
-Ocean flow is a great candidate for being modeled by a Gaussian process because the noisy signal requires a more unconstrained approach to modeling. Ocean flow is a function of numerous random elements like temperature, barometric pressure, cloud cover, etc. The sum off all these yields Gaussian distribution ([Central Limit Theorem](https://en.wikipedia.org/wiki/Central_limit_theorem)).
+Ocean flow is a great candidate for being modeled by a Gaussian process because the noisy signal requires a more unconstrained approach to modeling. Ocean flow is a function of numerous random elements like temperature, barometric pressure, cloud cover, etc. The sum off all these yields a Gaussian distribution ([Central Limit Theorem](https://en.wikipedia.org/wiki/Central_limit_theorem)).
 
 The Gaussian prior is sampling data from a Gaussian distribution with mean = 0 and a variance specified by the kernel covariance matrix, which is constructed with two hyperparameters: l<sup>2</sup> and σ<sup>2</sup> or length scale and variance. It is the model *before* the joint distribution is created from the training data.
 <p align="center">
@@ -97,14 +97,14 @@ Let's look at the same posterior model using the same hyperparameters as before.
 
 A definite improvement!
 </p>
-However, these are actually pretty terrible models. The first is definitely overfitting the data and would be quite inflexible, and the second one is much too noisy. We need to optimize the hyperparameters to get a best-fit model, but first we need to look more closely at how they impact the covariance matrix.
+However, these are terrible models. The first overfits the data, and the second one is noisy. We need to optimize the hyperparameters to get a best-fit model, but first we need to look more closely at how they impact the covariance matrix.
 </p>
 
 ### Step 7 - Visualizing Kernels as Covariance Matrices
 
-The covariance matrix is the multivariate extension to the variance specified in a typical Gaussian distribution. Kernels are essentially a similarity metric and are therefore typically used as covariance matrices in machine learning (gross over-simplification - a lot of mathematical proof behind this).
+The covariance matrix is the multivariate extension to the variance specified in a typical Gaussian distribution. Kernels are essentially a similarity metric and are therefore used as covariance matrices in machine learning (gross over-simplification - a lot of mathematical proof behind this).
 
-The kernel function will input an Nx1 matrix and return a symmetric, semi-definite NxN matrix and with each *(i, j)* entry equal to the covariance between points *(i, j)*. For cross-covariance, the input is an Nx1 and Mx1 matrix that returns a triangular NxM covariance matrix.
+The kernel function will input an Nx1 matrix and return a symmetric, semi-definite NxN matrix and with each *(i, j)* entry equal to the covariance between points *(i, j)*. For cross-covariance, the inputs are an Nx1 and an Mx1 matrix and the output is an NxM covariance matrix.
 
 In this particular model, I chose to use a [radial basis function kernel](https://github.com/jmerali3/Ocean_Flow/blob/841ab6ee56a8293ac6b4aa72879ae368686fe1c4/OceanFlow_utils.py#L86), which has two hyperparameters. The l<sup>2</sup> or length scale term indicates how fast the covariance decays as a function of the squared distance between the points, and σ<sup>2</sup> determines the variance at the diagonals. This is visualized below in the grid of heatmaps, which shows a N=10 kernel with varying hyperparameters.
 
